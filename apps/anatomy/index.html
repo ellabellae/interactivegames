@@ -51,6 +51,18 @@
   #status { top: 50%; left: 50%; transform: translate(-50%, -50%); font-family: "Instrument Serif", Georgia, serif; font-size: 22px; text-align: center;
     background: rgba(6, 10, 20, 0.72); padding: 14px 22px; border-radius: 6px; max-width: 28em; pointer-events: none; }
   #status.hidden { display: none; }
+  /* Flat look: the colours of legacy/heart-anatomy.html, applied over the hologram theme. */
+  body.look-flat, html:has(body.look-flat) { background: #14080a; }
+  body.look-flat { color: #f6e9e6; }
+  body.look-flat #video { filter: saturate(0.5) brightness(0.55); }
+  body.look-flat #vignette, body.look-flat #scanlines { display: none; }
+  body.look-flat #title em { color: #f4a3a3; }
+  body.look-flat #panel { background: rgba(20, 8, 10, 0.72); }
+  body.look-flat #parts li.grabbed { color: #ffb3b3; }
+  body.look-flat button:focus-visible { outline-color: #f4a3a3; }
+  body.look-flat .label { background: rgba(20, 8, 10, 0.78); }
+  body.look-flat #status { background: rgba(20, 8, 10, 0.72); }
+  body.look-flat.dragging::after { background: rgba(20, 8, 10, 0.6); }
   body.dragging::after { content: "Drop a .glb or .stl files"; position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
     background: rgba(6, 10, 20, 0.6); font-family: "Instrument Serif", Georgia, serif; font-size: 28px; }
 </style>
@@ -73,6 +85,7 @@
     <button id="explodeBtn">Explode</button>
     <button id="resetBtn">Reset</button>
     <button id="labelsBtn">Labels</button>
+    <button id="lookBtn" aria-label="Switch between hologram and flat look">Look: hologram</button>
   </div>
   <div class="row" style="margin-top:6px">
     <button id="loadBtn">Load model</button>
@@ -87,7 +100,7 @@
     <tr><td>Pinch on a part</td><td>grab it, move it, release to drop</td></tr>
     <tr><td>Two hands apart</td><td>scale</td></tr>
     <tr><td>Mouse</td><td>drag to rotate, scroll to zoom, click a part to isolate</td></tr>
-    <tr><td>Keys</td><td>E explode, R reset, L labels, B beat</td></tr>
+    <tr><td>Keys</td><td>E explode, R reset, L labels, B beat, V look</td></tr>
   </table>
 </div>
 <div class="ui" id="status">Starting camera…</div>

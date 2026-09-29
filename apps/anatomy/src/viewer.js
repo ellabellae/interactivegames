@@ -31,13 +31,22 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
 camera.position.set(0, 0, 4.6);
-scene.add(new THREE.HemisphereLight(0xbfe4ff, 0x120a14, 0.9));
-const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(2, 3, 4); scene.add(key);
-const fill = new THREE.DirectionalLight(0x7fd4ff, 0.6); fill.position.set(-3, -1, 2); scene.add(fill);
-const rim = new THREE.DirectionalLight(0xff5577, 0.8); rim.position.set(0, 1, -4); scene.add(rim);
+// Two render looks. "hologram" is legacy/heart-hologram.html; "flat" is the
+// plainer shading of legacy/heart-anatomy.html, which some students find
+// clearer. Each look has its own lights, palette, material and extras.
+const holoRig = new THREE.Group(), flatRig = new THREE.Group();
+scene.add(holoRig, flatRig);
+holoRig.add(new THREE.HemisphereLight(0xbfe4ff, 0x120a14, 0.9));
+const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(2, 3, 4); holoRig.add(key);
+const fill = new THREE.DirectionalLight(0x7fd4ff, 0.6); fill.position.set(-3, -1, 2); holoRig.add(fill);
+const rim = new THREE.DirectionalLight(0xff5577, 0.8); rim.position.set(0, 1, -4); holoRig.add(rim);
 // projection floor
 const floor = new THREE.PolarGridHelper(1.7, 12, 6, 72, 0x3fa9ff, 0x3fa9ff);
-floor.material.transparent = true; floor.material.opacity = 0.22; floor.position.y = -1.55; scene.add(floor);
+floor.material.transparent = true; floor.material.opacity = 0.22; floor.position.y = -1.55; holoRig.add(floor);
+// flat look lights (from heart-anatomy.html)
+flatRig.add(new THREE.HemisphereLight(0xfff3ef, 0x3a1a1c, 1.1));
+const flatKey = new THREE.DirectionalLight(0xffffff, 1.6); flatKey.position.set(2, 3, 4); flatRig.add(flatKey);
+const flatFill = new THREE.DirectionalLight(0xffd9d0, 0.5); flatFill.position.set(-3, -1, 2); flatRig.add(flatFill);
 
 const orbit = new OrbitControls(camera, renderer.domElement);
 orbit.enablePan = false; orbit.enableDamping = true; orbit.minDistance = 2; orbit.maxDistance = 12;
@@ -47,16 +56,30 @@ scene.add(group);
 let model = null;                  // the loaded heart, child of group
 let parts = [];                    // { name, object, meshes, center, offset, dir, color, visible, li, label }
 
-// ---------- colours ----------
-const RED = 0xff3b5c, BLUE = 0x3fa9ff;
-const PALETTE = [0xff3b5c, 0x3fa9ff, 0xffb347, 0x9be564, 0xd07dff, 0x5ce8e0, 0xf5e663, 0xff8a5c];
+// ---------- looks: colours and materials ----------
+const LOOKS = {
+  hologram: {
+    label: "hologram", rig: holoRig, holo: true, grabGlow: 0x335566, schematicName: "Schematic model · hologram",
+    red: 0xff3b5c, blue: 0x3fa9ff, palette: [0xff3b5c, 0x3fa9ff, 0xffb347, 0x9be564, 0xd07dff, 0x5ce8e0, 0xf5e663, 0xff8a5c],
+    material: (color) => makeHoloMaterial(color),
+  },
+  flat: {
+    label: "flat", rig: flatRig, holo: false, grabGlow: 0x552222, schematicName: "Schematic model",
+    red: 0xc9383f, blue: 0x4d6db3, palette: [0xc9383f, 0x4d6db3, 0xd98c3a, 0x7a9e5a, 0xb35c9e, 0x5aa1a8, 0xcbb04a, 0x8e6a4f],
+    material: (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.05 }),
+  },
+};
+const LOOK_KEY = "heart-hands:viewer-look";
+let look = LOOKS[(() => { try { return localStorage.getItem(LOOK_KEY); } catch { return null; } })()] ?? LOOKS.hologram;
+
 function colorFor(name, i) {
   const n = name.toLowerCase();
-  if (/(aort|left|pulmonary vein|lv|la\b)/.test(n)) return RED;
-  if (/(right|pulmonary (artery|trunk)|cava|rv|ra\b|svc|ivc)/.test(n)) return BLUE;
-  return PALETTE[i % PALETTE.length];
+  if (/(aort|left|pulmonary vein|lv|la\b)/.test(n)) return look.red;
+  if (/(right|pulmonary (artery|trunk)|cava|rv|ra\b|svc|ivc)/.test(n)) return look.blue;
+  return look.palette[i % look.palette.length];
 }
-function makeMaterial(color) {
+function makeMaterial(color) { return look.material(color); }
+function makeHoloMaterial(color) {
   const c = new THREE.Color(color);
   return new THREE.MeshPhysicalMaterial({
     color: c, roughness: 0.28, metalness: 0.15, transparent: true, opacity: 0.62,
@@ -94,6 +117,7 @@ const pointMat = new THREE.PointsMaterial({ size: 0.014, sizeAttenuation: true, 
 const wireMat = new THREE.MeshBasicMaterial({ color: 0x9fe3ff, wireframe: true, transparent: true, opacity: 0.06, depthWrite: false });
 // Adds the rim glow, sparse point cloud and faint wireframe on top of a surface mesh.
 function holographize(mesh, color) {
+  if (!look.holo) return;
   mesh.add(new THREE.Mesh(mesh.geometry, makeRimMaterial(color)));
   const wf = new THREE.Mesh(mesh.geometry, wireMat); wf.raycast = () => {}; mesh.add(wf);
   const src = mesh.geometry.attributes.position;
@@ -329,7 +353,7 @@ const tmpQ = new THREE.Quaternion();
 function setGrabHighlight(p, on) {
   p.meshes.forEach((m, k) => {
     if (!m.material.emissive) return;
-    if (on) { grab.emissive[k] = m.material.emissive.getHex(); m.material.emissive.setHex(0x335566); }
+    if (on) { grab.emissive[k] = m.material.emissive.getHex(); m.material.emissive.setHex(look.grabGlow); }
     else m.material.emissive.setHex(grab.emissive[k] ?? 0x000000);   // restore the part's own glow
   });
 }
@@ -436,7 +460,30 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-registerModel(buildSchematicHeart(), "Schematic model · hologram");
+// ---------- look switching ----------
+// Rebuilding re-runs the unchanged loader on the same source, so a loaded
+// GLB/STL set keeps working. Part positions and hidden parts reset.
+let lastFiles = null;   // files of the current model; null = built-in schematic
+$("file").addEventListener("change", (e) => { if (e.target.files.length) lastFiles = [...e.target.files]; });
+addEventListener("drop", (e) => { if (e.dataTransfer.files.length) lastFiles = [...e.dataTransfer.files]; });
+function applyLook() {
+  document.body.classList.toggle("look-flat", look === LOOKS.flat);
+  holoRig.visible = look === LOOKS.hologram; flatRig.visible = look === LOOKS.flat;
+  $("lookBtn").textContent = `Look: ${look.label}`;
+}
+function setLook(next) {
+  look = next;
+  try { localStorage.setItem(LOOK_KEY, look.label); } catch { /* storage blocked: look just isn't remembered */ }
+  applyLook();
+  fresnelUniformsAll.length = 0;
+  if (lastFiles) loadFiles(lastFiles); else registerModel(buildSchematicHeart(), look.schematicName);
+}
+const toggleLook = () => setLook(look === LOOKS.hologram ? LOOKS.flat : LOOKS.hologram);
+$("lookBtn").addEventListener("click", toggleLook);
+addEventListener("keydown", (e) => { if (e.key === "v" || e.key === "V") toggleLook(); });
+
+applyLook();
+registerModel(buildSchematicHeart(), look.schematicName);
 requestAnimationFrame(frame);
 
 (async () => {
