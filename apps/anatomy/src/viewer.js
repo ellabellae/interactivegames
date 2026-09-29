@@ -23,7 +23,10 @@ const BEAT_AMOUNT = 0.025;
 const $ = (id) => document.getElementById(id);
 const video = $("video"), handCanvas = $("hands"), handCtx = handCanvas.getContext("2d");
 const statusEl = $("status"), partsEl = $("parts"), subtitleEl = $("subtitle");
-const setStatus = (msg) => { statusEl.textContent = msg; statusEl.classList.toggle("hidden", !msg); };
+let statusTimer = null;
+const setStatus = (msg) => { clearTimeout(statusTimer); statusEl.textContent = msg; statusEl.classList.toggle("hidden", !msg); };
+/** A message that clears itself, so it doesn't sit over the heart. */
+const flashStatus = (msg, ms = 6000) => { setStatus(msg); statusTimer = setTimeout(() => setStatus(""), ms); };
 
 // ---------- three.js ----------
 const renderer = new THREE.WebGLRenderer({ canvas: $("scene"), alpha: true, antialias: true });
@@ -463,7 +466,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   const t = now / 1000;
-  const hands = tracker?.read();
+  const hands = handsOn ? tracker?.read() : null;
   if (hands) slots.updateHands(hands);
   const inputs = slots.frame();
   if (model) applyGestures(dt, inputs);
@@ -540,18 +543,42 @@ $("credit").textContent = CREDIT;
 loadBuiltIn();
 requestAnimationFrame(frame);
 
-(async () => {
+// ---------- hand control (opt-in) ----------
+// Off by default: the mouse is the main way to study the model, and the
+// camera isn't requested until the student turns hand control on.
+const HANDS_KEY = "heart-hands:viewer-hands";
+let handsOn = false;
+function showHandsState() {
+  $("handsBtn").textContent = `Hand control: ${handsOn ? "on" : "off"}`;
+  $("handsBtn").setAttribute("aria-pressed", String(handsOn));
+  document.body.classList.toggle("hands-off", !handsOn);
+}
+function saveHands() { try { localStorage.setItem(HANDS_KEY, handsOn ? "on" : "off"); } catch { /* not remembered */ } }
+async function enableHands() {
+  handsOn = true; showHandsState();
   try {
+    setStatus("Starting camera…");
     await startCamera(video);
     setStatus("Loading hand tracking…");
-    tracker = await createTracker(video);
-    setStatus("");
+    tracker = tracker ?? await createTracker(video);
+    setStatus(""); saveHands();
   } catch (err) {
     console.error(err);
+    disableHands();
     if (isCameraBlocked(err)) {
-      setStatus("Camera blocked. Allow camera access for this page in the address bar, then reload. Mouse controls still work.");
+      flashStatus("Camera blocked. Allow camera access for this page in the address bar, then turn hand control on again. Mouse controls still work.");
     } else {
-      setStatus("Couldn't load hand tracking. Check your internet connection and reload. Mouse controls still work.");
+      flashStatus("Couldn't load hand tracking. Check your internet connection and try again. Mouse controls still work.");
     }
   }
-})();
+}
+function disableHands() {
+  handsOn = false; showHandsState();
+  const stream = video.srcObject;
+  if (stream) { stream.getTracks().forEach((t) => t.stop()); video.srcObject = null; }
+  slots.reset(); saveHands();
+}
+$("handsBtn").addEventListener("click", () => { if (handsOn) disableHands(); else enableHands(); });
+setStatus("");
+showHandsState();
+if ((() => { try { return localStorage.getItem(HANDS_KEY) === "on"; } catch { return false; } })()) enableHands();

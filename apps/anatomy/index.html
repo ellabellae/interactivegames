@@ -40,6 +40,8 @@
   #panel a { color: inherit; opacity: 0.7; }
   #panel select { font: inherit; color: inherit; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18); border-radius: 5px; padding: 4px 6px; width: 100%; margin-bottom: 8px; }
   #panel select option { color: #111; }
+  body.hands-off .hand-row { display: none; }
+  body.hands-off #video { visibility: hidden; }
   #credit { opacity: 0.55; margin-top: 8px; line-height: 1.4; font-size: 11px; }
 
   #legend { bottom: 24px; left: 26px; line-height: 1.7; pointer-events: none; }
@@ -93,6 +95,9 @@
     <button id="lookBtn" aria-label="Switch between hologram and flat look">Look: hologram</button>
   </div>
   <div class="row" style="margin-top:6px">
+    <button id="handsBtn" aria-pressed="false">Hand control: off</button>
+  </div>
+  <div class="row" style="margin-top:6px">
     <button id="loadBtn">Load model</button>
     <input id="file" type="file" multiple accept=".glb,.gltf,.stl">
   </div>
@@ -103,14 +108,14 @@
 
 <div class="ui" id="legend">
   <table>
-    <tr><td>Open hand</td><td>rotate</td></tr>
-    <tr><td>Pinch on a part</td><td>grab it, move it, release to drop</td></tr>
-    <tr><td>Two hands apart</td><td>scale</td></tr>
     <tr><td>Mouse</td><td>drag to rotate, scroll to zoom, click a part to isolate</td></tr>
+    <tr class="hand-row"><td>Open hand</td><td>rotate</td></tr>
+    <tr class="hand-row"><td>Pinch on a part</td><td>grab it, move it, release to drop</td></tr>
+    <tr class="hand-row"><td>Two hands apart</td><td>scale</td></tr>
     <tr><td>Keys</td><td>E explode, R reset, L labels, B beat, V look</td></tr>
   </table>
 </div>
-<div class="ui" id="status">Starting camera…</div>
+<div class="ui hidden" id="status"></div>
 
 <script type="module" src="./src/viewer.js"></script>
 </body>
