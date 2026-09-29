@@ -57,6 +57,11 @@ describe("activationTimes (muscle spread)", () => {
     const t = activationTimes([10, 0, 0], [{ p: [0, 0, 0], t: 0 }, { p: [12, 0, 0], t: 1 }], 1);
     expect(t[0]).toBeCloseTo(3);
   });
+  it("scaled spread never passes the set time, even with later sources (stretching)", () => {
+    // early source far away, late source close by: stretching to 160 ms must not push the close point past 160
+    const t = activationTimes([0, 0, 0, 2, 0, 0, 50, 0, 0], [{ p: [0, 0, 0], t: 100 }, { p: [50, 0, 0], t: 150 }], 1, 160);
+    expect(Math.max(...t)).toBeCloseTo(160, 6);
+  });
   it("can be scaled so the last point activates at a set time", () => {
     const t = activationTimes([0, 0, 0, 10, 0, 0, 20, 0, 0], [{ p: [0, 0, 0], t: 100 }], 1, 160);
     expect(t[2]).toBeCloseTo(160); expect(t[1]).toBeCloseTo(130); expect(t[0]).toBe(100);

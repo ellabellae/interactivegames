@@ -25,6 +25,17 @@ export const LECTURE = {
   ventricularContractionMs: { value: 300, source: "slide 13: contraction continues for 0.3 s" },
 };
 
+/**
+ * Values the lecture does not give, needed to keep the model consistent with
+ * what it describes. Each says why it's needed. A teacher should check these.
+ */
+export const ASSUMED = {
+  atrialActivationMs: {
+    value: 90,
+    source: "NOT from the lecture: typical P-wave duration (about 80-100 ms). Needed because at the lecture's 0.3-0.5 m/s the far atrial wall would otherwise depolarise after the ventricles, which contradicts slide 5 (atria finish during the AV delay).",
+  },
+};
+
 const dist = (/** @type {Vec3} */ a, /** @type {Vec3} */ b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 /** Cumulative length (mm) at each point of a path. */
 export function cumulative(/** @type {Vec3[]} */ path) {
@@ -134,9 +145,13 @@ export function activationTimes(positions, sources, velocity, lastMs) {
   const out = new Float32Array(n);
   let k = 1;
   if (lastMs !== undefined) {
-    let maxT = -Infinity, iMax = 0;
-    for (let i = 0; i < n; i++) if (base[i] + extra[i] > maxT) { maxT = base[i] + extra[i]; iMax = i; }
-    k = extra[iMax] > 0 ? (lastMs - base[iMax]) / extra[iMax] : 1;
+    // Largest scale that keeps every point at or before lastMs; the point that
+    // limits it lands exactly on lastMs. (Scaling from the single latest point
+    // isn't enough: when the spread is stretched, a point with a later source
+    // but a short muscle distance can overshoot.)
+    k = Infinity;
+    for (let i = 0; i < n; i++) if (extra[i] > 0) k = Math.min(k, (lastMs - base[i]) / extra[i]);
+    if (!Number.isFinite(k)) k = 1;
   }
   for (let i = 0; i < n; i++) out[i] = base[i] + extra[i] * k;
   return out;
