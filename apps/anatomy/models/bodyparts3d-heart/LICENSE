@@ -1,0 +1,14 @@
+The files in this folder are an adaptation of BodyParts3D.
+
+BodyParts3D, (c) The Database Center for Life Science,
+licensed under Creative Commons Attribution-Share Alike 2.1 Japan.
+https://creativecommons.org/licenses/by-sa/2.1/jp/deed.en
+
+Changes: selected, grouped into named parts, trimmed, rotated, vertices welded,
+normals added. See README.md in this folder for details.
+
+This adaptation is licensed under the same terms:
+Creative Commons Attribution-Share Alike 2.1 Japan.
+
+This licence applies only to the files in this folder, not to the rest of the
+repository.
