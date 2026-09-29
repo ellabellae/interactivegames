@@ -370,6 +370,7 @@ function drawHands() {
 // ---------- gestures ----------
 const state = { rotX: 0, rotY: 0, targetRotX: 0, targetRotY: 0, scale: 1, targetScale: 1 };
 const grab = { part: -1, depth: 0, prev: null, emissive: [] };
+let rotPrev = null;   // palm position last frame, for relative hand rotation
 const tmpQ = new THREE.Quaternion();
 
 function setGrabHighlight(p, on) {
@@ -425,10 +426,16 @@ function applyGestures(dt, inputs) {
       const m = V.twoHandScale;
       state.targetScale = THREE.MathUtils.clamp(THREE.MathUtils.mapLinear(d, m.from[0], m.from[1], m.to[0], m.to[1]), m.clamp[0], m.clamp[1]);
     }
-    if (grab.part < 0) {
-      state.targetRotY = (cx - 0.5) * Math.PI * V.rotateGain.y;
-      state.targetRotX = (cy - 0.5) * Math.PI * V.rotateGain.x;
+    // Rotation follows how far the hand moves, not where it is, so the heart
+    // doesn't jump when a hand comes into view and stays put when it leaves.
+    // Same gain as before: moving across the whole frame turns it the same amount.
+    if (grab.part < 0 && rotPrev) {
+      state.targetRotY += (cx - rotPrev.x) * Math.PI * V.rotateGain.y;
+      state.targetRotX += (cy - rotPrev.y) * Math.PI * V.rotateGain.x;
     }
+    rotPrev = grab.part < 0 ? { x: cx, y: cy } : null;
+  } else {
+    rotPrev = null;
   }
   state.rotX += (state.targetRotX - state.rotX) * Math.min(1, dt * V.rotateEase);
   state.rotY += (state.targetRotY - state.rotY) * Math.min(1, dt * V.rotateEase);
