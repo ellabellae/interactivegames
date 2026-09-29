@@ -38,6 +38,9 @@
   #loadHint { opacity: 0.55; margin-top: 8px; line-height: 1.4; }
   #file { display: none; }
   #panel a { color: inherit; opacity: 0.7; }
+  #panel select { font: inherit; color: inherit; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18); border-radius: 5px; padding: 4px 6px; width: 100%; margin-bottom: 8px; }
+  #panel select option { color: #111; }
+  #credit { opacity: 0.55; margin-top: 8px; line-height: 1.4; font-size: 11px; }
 
   #legend { bottom: 24px; left: 26px; line-height: 1.7; pointer-events: none; }
   #legend table { border-collapse: collapse; }
@@ -80,6 +83,7 @@
 <div class="ui" id="subtitle">Schematic model · hologram</div>
 
 <div class="ui" id="panel">
+  <select id="modelSel" aria-label="Heart model"><option value="realistic">Realistic heart (BodyParts3D)</option><option value="schematic">Schematic heart</option></select>
   <h2>Parts</h2>
   <ul id="parts"></ul>
   <div class="row">
@@ -93,6 +97,7 @@
     <input id="file" type="file" multiple accept=".glb,.gltf,.stl">
   </div>
   <div id="loadHint">One .glb with named parts, or several .stl files (one per structure, e.g. exported from 3D Slicer). Or drop them on the page.</div>
+  <div id="credit" hidden></div>
   <div style="margin-top:8px"><a href="./particles.html">Particle heart demo →</a></div>
 </div>
 
