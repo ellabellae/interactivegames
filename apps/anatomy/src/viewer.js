@@ -74,8 +74,17 @@ let look = LOOKS[(() => { try { return localStorage.getItem(LOOK_KEY); } catch {
 
 function colorFor(name, i) {
   const n = name.toLowerCase();
-  if (/(aort|left|pulmonary vein|lv|la\b)/.test(n)) return look.red;
-  if (/(right|pulmonary (artery|trunk)|cava|rv|ra\b|svc|ivc)/.test(n)) return look.blue;
+  // Vessels by oxygenation first: pulmonary veins carry oxygenated blood (red),
+  // pulmonary arteries deoxygenated (blue); other arteries red, other veins blue.
+  if (/pulmonary vein/.test(n)) return look.red;
+  if (/pulmonary (arter|trunk)|cava|coronary sinus|cardiac vein/.test(n)) return look.blue;
+  if (/arter|circumflex/.test(n)) return look.red;
+  // Valves get distinct colours so the four are easy to tell apart.
+  if (/valve/.test(n)) return look.palette[i % look.palette.length];
+  // Otherwise by side of the heart (the prototype's rule; abbreviations are
+  // whole words so "lv" doesn't match inside "valve").
+  if (/(aort|left|pulmonary vein|\blv\b|\bla\b)/.test(n)) return look.red;
+  if (/(right|pulmonary (artery|trunk)|cava|\brv\b|\bra\b|svc|ivc)/.test(n)) return look.blue;
   return look.palette[i % look.palette.length];
 }
 function makeMaterial(color) { return look.material(color); }
