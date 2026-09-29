@@ -112,40 +112,54 @@ export function createStir(cfg) {
 }
 
 /**
- * Reversal counter shared by chop (vertical) and shake (horizontal): a count
- * happens when the direction of travel flips after moving more than
- * `travelPx` since the last counted turning point.
+ * Stroke counter shared by chop (vertical) and shake (horizontal).
+ *
+ * Counts one stroke each time the hand travels more than `travelPx` in one
+ * direction, measured from the furthest point of the previous stroke (a
+ * "zigzag" swing detector). Consequences:
+ * - any stroke longer than travelPx counts, wherever the first one starts
+ * - wobbles smaller than travelPx never register as a turn, so a tremor in
+ *   the middle of a stroke doesn't split it into short, uncounted pieces
+ * - the count happens once the new stroke has covered travelPx, not at the
+ *   exact turning point
+ * Leaving the target (pt = null) ends the current stroke.
+ *
+ * Replaces the prototype's rule (legacy/kitchen-race.html), which measured
+ * from the last *counted* turn, so before the first count it measured from
+ * wherever the hand entered the target: 24-32px chops could then count 0/10.
  * @param {"x" | "y"} axis
  * @param {number} travelPx
- * @param {(dir: number) => boolean} countsOn which new direction scores (chop: only downward)
+ * @param {(dir: number) => boolean} countsOn which stroke direction scores (chop: only downward)
  */
 function createReversal(axis, travelPx, countsOn) {
-  /** @type {number | null} */ let prev = null;
-  /** @type {number | null} */ let ext = null;
-  let dir = 0;
+  let dir = 0;                               // +1 increasing, -1 decreasing, 0 not decided yet
+  /** @type {number | null} */ let ext = null;  // furthest point of the current stroke
+  let hi = 0, lo = 0;                        // range seen while dir is undecided
+  const start = (/** @type {number} */ d, /** @type {number} */ v) => { dir = d; ext = v; return countsOn(d) ? 1 : 0; };
   return {
     /** @param {Point | null} pt  null ends the current stroke */
     update(pt) {
-      if (!pt) { prev = null; return 0; }
+      if (!pt) { dir = 0; ext = null; return 0; }
       const v = pt[axis];
-      let n = 0;
-      if (prev != null) {
-        const d = Math.sign(v - prev);
-        if (d && dir && d !== dir && Math.abs(v - (ext ?? v)) > travelPx) { ext = v; if (countsOn(d)) n = 1; }
-        if (d) dir = d;
-        if (ext == null) ext = v;
+      if (ext == null) { ext = hi = lo = v; return 0; }
+      if (dir === 0) {
+        hi = Math.max(hi, v); lo = Math.min(lo, v);
+        if (v - lo > travelPx) return start(1, v);
+        if (hi - v > travelPx) return start(-1, v);
+        return 0;
       }
-      prev = v;
-      return n;
+      if ((v - ext) * dir >= 0) { ext = v; return 0; }          // still going the same way
+      if (Math.abs(v - ext) > travelPx) return start(-dir, v);   // turned and travelled far enough
+      return 0;
     },
-    reset() { prev = null; ext = null; dir = 0; },
+    reset() { dir = 0; ext = null; },
   };
 }
 
 /**
- * Chop: up-and-down over the target. Counts on the turn from rising to
- * falling (screen y increasing) after more than `travelPx` of travel.
- * From legacy/kitchen-race.html, case "chop".
+ * Chop: up-and-down over the target. Counts each downward stroke (screen
+ * y increasing) longer than `travelPx`.
+ * Adapted from legacy/kitchen-race.html, case "chop" (see createReversal).
  * @param {{ travelPx: number }} cfg
  * @returns {Detector}
  */
@@ -175,11 +189,14 @@ export function createFlick(cfg) {
   let cool = 0;
   return {
     update(pt, target, dt) {
+      // The cooldown runs on time, with or without input. (In the prototype it
+      // only ran while there was a point, so with a mouse, which only gives a
+      // point while the button is down, later flicks were ignored.)
+      if (dt > 0) cool = Math.max(0, cool - dt);
       if (!pt) { prevY = null; return 0; }
       let n = 0;
       if (prevY != null && dt > 0) {
         const vy = (prevY - pt.y) / dt;
-        cool = Math.max(0, cool - dt);
         if (vy > cfg.minSpeedPxPerS && cool === 0 && isNear({ x: pt.x, y: prevY }, target)) { cool = cfg.cooldownS; n = 1; }
       }
       prevY = pt.y;
@@ -191,10 +208,10 @@ export function createFlick(cfg) {
 }
 
 /**
- * Shake: side to side over the target while holding something. Counts on
- * every direction change after more than travelPx of horizontal travel.
+ * Shake: side to side over the target while holding something. Counts
+ * each sideways stroke, either way, longer than travelPx.
  * The caller passes pt = null whenever nothing is held.
- * From legacy/kitchen-race.html, case "shake" (same turning-point quirk as chop).
+ * Adapted from legacy/kitchen-race.html, case "shake" (see createReversal).
  * @param {{ travelPx: number }} cfg
  * @returns {Detector}
  */
