@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heart · hologram</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; background: #04060c; overflow: hidden; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", sans-serif; color: #e6f0f6; font-size: 13px; }
+
+  #video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); filter: saturate(0.25) brightness(0.32) contrast(1.1); }
+  #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 2;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(4,6,12,0.85) 100%); }
+  #scanlines { position: fixed; inset: 0; pointer-events: none; z-index: 3; opacity: 0.35; mix-blend-mode: overlay;
+    background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.06) 0 1px, rgba(0,0,0,0.12) 1px 3px); }
+  #scene { z-index: 1; } #hands { z-index: 4; }
+  #scene, #hands { position: fixed; inset: 0; width: 100%; height: 100%; }
+  #hands { pointer-events: none; }
+
+  .ui { position: fixed; z-index: 10; }
+  #title { top: 22px; left: 26px; font-family: "Instrument Serif", Georgia, serif; font-size: 28px; pointer-events: none; }
+  #title em { font-style: italic; color: #7fd4ff; }
+  #subtitle { top: 56px; left: 27px; opacity: 0.6; pointer-events: none; }
+
+  #panel { top: 22px; right: 22px; width: 220px; background: rgba(6, 10, 20, 0.72); border-radius: 8px; padding: 12px 14px; backdrop-filter: blur(6px); }
+  #panel h2 { font-family: "Instrument Serif", Georgia, serif; font-weight: 400; font-size: 18px; margin: 0 0 8px; }
+  #parts { list-style: none; margin: 0 0 10px; padding: 0; max-height: 46vh; overflow: auto; }
+  #parts li { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: pointer; }
+  #parts li.grabbed { color: #9fe3ff; }
+  #parts .swatch { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  #parts .name { flex: 1; }
+  #parts li.hidden .name { opacity: 0.4; text-decoration: line-through; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; }
+  button { font: inherit; color: inherit; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18); border-radius: 5px; padding: 5px 9px; cursor: pointer; }
+  button:hover { background: rgba(255,255,255,0.18); }
+  button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 1px; }
+  #loadHint { opacity: 0.55; margin-top: 8px; line-height: 1.4; }
+  #file { display: none; }
+
+  #legend { bottom: 24px; left: 26px; line-height: 1.7; pointer-events: none; }
+  #legend table { border-collapse: collapse; }
+  #legend td { padding: 0 18px 0 0; vertical-align: top; }
+  #legend td:first-child { opacity: 0.6; }
+
+  .label { position: fixed; z-index: 9; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap;
+    padding: 3px 8px; border-radius: 4px; background: rgba(6, 10, 20, 0.78); font-size: 12px; margin-top: -8px; }
+  .label::after { content: ""; position: absolute; left: 50%; bottom: -5px; width: 1px; height: 5px; background: rgba(255,255,255,0.5); }
+  .label.hidden { display: none; }
+
+  #status { top: 50%; left: 50%; transform: translate(-50%, -50%); font-family: "Instrument Serif", Georgia, serif; font-size: 22px; text-align: center;
+    background: rgba(6, 10, 20, 0.72); padding: 14px 22px; border-radius: 6px; max-width: 28em; pointer-events: none; }
+  #status.hidden { display: none; }
+  body.dragging::after { content: "Drop a .glb or .stl files"; position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
+    background: rgba(6, 10, 20, 0.6); font-family: "Instrument Serif", Georgia, serif; font-size: 28px; }
+</style>
+</head>
+<body>
+
+<video id="video" autoplay muted playsinline></video>
+<canvas id="scene"></canvas>
+<div id="vignette"></div>
+<div id="scanlines"></div>
+<canvas id="hands"></canvas>
+
+<div class="ui" id="title">Heart <em>anatomy</em></div>
+<div class="ui" id="subtitle">Schematic model · hologram</div>
+
+<div class="ui" id="panel">
+  <h2>Parts</h2>
+  <ul id="parts"></ul>
+  <div class="row">
+    <button id="explodeBtn">Explode</button>
+    <button id="resetBtn">Reset</button>
+    <button id="labelsBtn">Labels</button>
+  </div>
+  <div class="row" style="margin-top:6px">
+    <button id="loadBtn">Load model</button>
+    <input id="file" type="file" multiple accept=".glb,.gltf,.stl">
+  </div>
+  <div id="loadHint">One .glb with named parts, or several .stl files (one per structure, e.g. exported from 3D Slicer). Or drop them on the page.</div>
+</div>
+
+<div class="ui" id="legend">
+  <table>
+    <tr><td>Open hand</td><td>rotate</td></tr>
+    <tr><td>Pinch on a part</td><td>grab it, move it, release to drop</td></tr>
+    <tr><td>Two hands apart</td><td>scale</td></tr>
+    <tr><td>Mouse</td><td>drag to rotate, scroll to zoom, click a part to isolate</td></tr>
+    <tr><td>Keys</td><td>E explode, R reset, L labels, B beat</td></tr>
+  </table>
+</div>
+<div class="ui" id="status">Starting camera…</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { STLLoader } from "three/addons/loaders/STLLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+// ---------- settings ----------
+const PINCH_THRESHOLD = 0.32;  // thumb–index distance relative to hand size
+const GRAB_RADIUS_PX = 110;    // how close the pinch has to be to a part's centre
+const MODEL_SIZE = 2.3;        // models are normalised to this many world units across
+let bpm = 70, beatOn = true;
+const BEAT_AMOUNT = 0.025;
+
+// ---------- DOM ----------
+const $ = (id) => document.getElementById(id);
+const video = $("video"), handCanvas = $("hands"), handCtx = handCanvas.getContext("2d");
+const statusEl = $("status"), partsEl = $("parts"), subtitleEl = $("subtitle");
+const setStatus = (msg) => { statusEl.textContent = msg; statusEl.classList.toggle("hidden", !msg); };
+
+// ---------- three.js ----------
+const renderer = new THREE.WebGLRenderer({ canvas: $("scene"), alpha: true, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+camera.position.set(0, 0, 4.6);
+scene.add(new THREE.HemisphereLight(0xbfe4ff, 0x120a14, 0.9));
+const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(2, 3, 4); scene.add(key);
+const fill = new THREE.DirectionalLight(0x7fd4ff, 0.6); fill.position.set(-3, -1, 2); scene.add(fill);
+const rim = new THREE.DirectionalLight(0xff5577, 0.8); rim.position.set(0, 1, -4); scene.add(rim);
+// projection floor
+const floor = new THREE.PolarGridHelper(1.7, 12, 6, 72, 0x3fa9ff, 0x3fa9ff);
+floor.material.transparent = true; floor.material.opacity = 0.22; floor.position.y = -1.55; scene.add(floor);
+
+const orbit = new OrbitControls(camera, renderer.domElement);
+orbit.enablePan = false; orbit.enableDamping = true; orbit.minDistance = 2; orbit.maxDistance = 12;
+
+const group = new THREE.Group();   // hand rotation + scale
+scene.add(group);
+let model = null;                  // the loaded heart, child of group
+let parts = [];                    // { name, object, meshes, center, offset, dir, color, visible, li, label }
+
+// ---------- colours ----------
+const RED = 0xff3b5c, BLUE = 0x3fa9ff;
+const PALETTE = [0xff3b5c, 0x3fa9ff, 0xffb347, 0x9be564, 0xd07dff, 0x5ce8e0, 0xf5e663, 0xff8a5c];
+function colorFor(name, i) {
+  const n = name.toLowerCase();
+  if (/(aort|left|pulmonary vein|lv|la\b)/.test(n)) return RED;
+  if (/(right|pulmonary (artery|trunk)|cava|rv|ra\b|svc|ivc)/.test(n)) return BLUE;
+  return PALETTE[i % PALETTE.length];
+}
+function makeMaterial(color) {
+  const c = new THREE.Color(color);
+  return new THREE.MeshPhysicalMaterial({
+    color: c, roughness: 0.28, metalness: 0.15, transparent: true, opacity: 0.62,
+    clearcoat: 1, clearcoatRoughness: 0.25, emissive: c.clone().multiplyScalar(0.12), side: THREE.FrontSide,
+  });
+}
+// Rim-light shader: bright edges, translucent centre, a scan band sweeping upward.
+const fresnelUniformsAll = [];
+function makeRimMaterial(color) {
+  const u = { glow: { value: new THREE.Color(color) }, time: { value: 0 } };
+  fresnelUniformsAll.push(u);
+  return new THREE.ShaderMaterial({
+    uniforms: u, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    vertexShader: `
+      varying vec3 vN; varying vec3 vV; varying float vWy;
+      void main() {
+        vN = normalize(normalMatrix * normal);
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vV = normalize(-mv.xyz);
+        vWy = (modelMatrix * vec4(position, 1.0)).y;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform vec3 glow; uniform float time;
+      varying vec3 vN; varying vec3 vV; varying float vWy;
+      void main() {
+        float f = pow(1.0 - max(dot(normalize(vN), normalize(vV)), 0.0), 2.6);
+        float band = smoothstep(0.06, 0.0, abs(fract(vWy * 0.45 - time * 0.12) - 0.5) - 0.44);
+        float a = f * 0.9 + band * 0.22;
+        gl_FragColor = vec4(glow * a + vec3(0.6) * band * 0.15, a);
+      }`,
+  });
+}
+const pointMat = new THREE.PointsMaterial({ size: 0.014, sizeAttenuation: true, color: 0xdff4ff, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending });
+const wireMat = new THREE.MeshBasicMaterial({ color: 0x9fe3ff, wireframe: true, transparent: true, opacity: 0.06, depthWrite: false });
+// Adds the rim glow, sparse point cloud and faint wireframe on top of a surface mesh.
+function holographize(mesh, color) {
+  mesh.add(new THREE.Mesh(mesh.geometry, makeRimMaterial(color)));
+  const wf = new THREE.Mesh(mesh.geometry, wireMat); wf.raycast = () => {}; mesh.add(wf);
+  const src = mesh.geometry.attributes.position;
+  const stride = Math.max(1, Math.floor(src.count / 700));
+  const n = Math.floor(src.count / stride);
+  const arr = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { const k = i * stride; arr[i * 3] = src.getX(k); arr[i * 3 + 1] = src.getY(k); arr[i * 3 + 2] = src.getZ(k); }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(arr, 3));
+  const pts = new THREE.Points(g, pointMat); pts.raycast = () => {}; mesh.add(pts);
+  mesh.children.forEach((c) => (c.raycast = () => {}));
+}
+
+// ---------- built-in schematic heart ----------
+// Anterior view: the patient's right side is on the viewer's left (negative x).
+// Organic chamber: a sphere with low-frequency bumps and an optional taper so ventricles narrow toward the apex.
+function blob(rx, ry, rz, x, y, z, taper = 0, seed = 1) {
+  const geo = new THREE.SphereGeometry(1, 72, 54);
+  const p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    let vx = p.getX(i), vy = p.getY(i), vz = p.getZ(i);
+    const n = 0.045 * Math.sin(3.1 * vx + seed) * Math.cos(2.7 * vy - seed) + 0.035 * Math.sin(4.3 * vz + 2.0 * vy + seed * 0.7) + 0.02 * Math.cos(6.0 * vx * vz + seed);
+    const r = 1 + n;
+    const t = 1 + taper * vy;              // vy in [-1,1]; negative taper narrows the bottom
+    p.setXYZ(i, vx * r * t, vy * r, vz * r * t);
+  }
+  geo.computeVertexNormals();
+  const m = new THREE.Mesh(geo);
+  m.scale.set(rx, ry, rz); m.position.set(x, y, z); return m;
+}
+function tube(pointsArr, radius) {
+  const curve = new THREE.CatmullRomCurve3(pointsArr.map((p) => new THREE.Vector3(...p)));
+  const geo = new THREE.TubeGeometry(curve, 96, radius, 28, false);
+  const p = geo.attributes.position;                       // slight wall irregularity
+  for (let i = 0; i < p.count; i++) {
+    const vx = p.getX(i), vy = p.getY(i), vz = p.getZ(i);
+    const k = 1 + 0.03 * Math.sin(9.0 * vy + 5.0 * vx) * Math.cos(7.0 * vz);
+    p.setXYZ(i, vx * k, vy * k, vz * k);
+  }
+  geo.computeVertexNormals();
+  return new THREE.Mesh(geo);
+}
+function buildSchematicHeart() {
+  const root = new THREE.Group();
+  const add = (name, ...meshes) => { const g = new THREE.Group(); g.name = name; meshes.forEach((m) => g.add(m)); root.add(g); };
+  add("Right atrium",     blob(0.42, 0.40, 0.36, -0.62, 0.32, 0.18, 0, 1));
+  add("Right ventricle",  blob(0.52, 0.66, 0.42, -0.30, -0.42, 0.34, 0.35, 2));
+  add("Left atrium",      blob(0.42, 0.38, 0.38,  0.44, 0.38, -0.34, 0, 3));
+  add("Left ventricle",   blob(0.56, 0.80, 0.50,  0.34, -0.50, -0.10, 0.42, 4));
+  add("Aorta",            tube([[0.12, 0.25, -0.12], [0.06, 0.85, -0.12], [0.22, 1.30, -0.22], [0.62, 1.22, -0.36], [0.72, 0.60, -0.50], [0.68, -0.60, -0.55]], 0.14));
+  add("Pulmonary trunk",  tube([[-0.28, 0.15, 0.42], [-0.18, 0.62, 0.40], [0.02, 0.92, 0.18], [0.30, 0.98, -0.02]], 0.13),
+                          tube([[0.02, 0.92, 0.18], [-0.35, 1.02, 0.02], [-0.75, 0.98, -0.12]], 0.10));
+  add("Superior vena cava", tube([[-0.64, 0.62, 0.10], [-0.66, 1.05, 0.06], [-0.66, 1.45, 0.02]], 0.12));
+  add("Inferior vena cava", tube([[-0.66, 0.02, 0.02], [-0.70, -0.55, -0.10], [-0.72, -1.05, -0.18]], 0.12));
+  add("Pulmonary veins",
+      tube([[0.55, 0.45, -0.55], [0.95, 0.55, -0.75]], 0.06), tube([[0.55, 0.30, -0.60], [0.95, 0.15, -0.80]], 0.06),
+      tube([[0.35, 0.50, -0.62], [0.00, 0.62, -0.85]], 0.06), tube([[0.35, 0.32, -0.66], [0.00, 0.20, -0.88]], 0.06));
+  return root;
+}
+
+// ---------- part registration ----------
+function clearModel() {
+  if (model) group.remove(model);
+  parts.forEach((p) => p.label.remove());
+  parts = []; partsEl.innerHTML = ""; model = null;
+}
+function registerModel(root, sourceName) {
+  clearModel();
+  model = root;
+  // Decide what counts as a "part": top-level named children if there are several, otherwise every mesh.
+  let candidates = root.children.filter((c) => c.getObjectByProperty("isMesh", true));
+  if (candidates.length < 2) { candidates = []; root.traverse((o) => { if (o.isMesh) candidates.push(o); }); }
+  // Re-parent so every part is a direct child of the model root, keeping its world transform.
+  scene.add(root);
+  root.updateMatrixWorld(true);
+  candidates.forEach((o) => root.attach(o));
+  candidates = candidates.slice(0, 60);
+
+  const box = new THREE.Box3().setFromObject(root);
+  const size = box.getSize(new THREE.Vector3()), centre = box.getCenter(new THREE.Vector3());
+  const s = MODEL_SIZE / Math.max(size.x, size.y, size.z);
+
+  candidates.forEach((o, i) => {
+    const name = (o.name && o.name.trim()) || `Part ${i + 1}`;
+    const meshes = []; o.traverse((m) => { if (m.isMesh) meshes.push(m); });
+    const color = colorFor(name, i);
+    meshes.forEach((m) => {
+      const keep = m.material && m.material.map;      // keep textured materials from GLBs
+      if (!keep) m.material = makeMaterial(color);
+      else { m.material.transparent = true; m.material.opacity = 0.7; }
+      m.userData.partIndex = i;
+      holographize(m, color);
+    });
+    const pc = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3());
+    const dir = pc.clone().sub(centre); if (dir.lengthSq() < 1e-6) dir.set(0, 1, 0); dir.normalize();
+    const label = document.createElement("div"); label.className = "label hidden"; label.textContent = name; document.body.appendChild(label);
+    parts.push({ name, object: o, meshes, basePos: o.position.clone(), center: pc, offset: new THREE.Vector3(), dir, color, visible: true, label, radius: Math.max(size.x, size.y, size.z) });
+  });
+
+  scene.remove(root);
+  root.scale.setScalar(s);
+  root.position.copy(centre).multiplyScalar(-s);
+  group.add(root);
+  buildPartsList();
+  subtitleEl.textContent = sourceName;
+}
+function buildPartsList() {
+  parts.forEach((p, i) => {
+    const li = document.createElement("li");
+    const sw = document.createElement("span"); sw.className = "swatch"; sw.style.background = "#" + new THREE.Color(p.color).getHexString();
+    const nm = document.createElement("span"); nm.className = "name"; nm.textContent = p.name;
+    li.append(sw, nm); li.title = "Click to isolate";
+    li.addEventListener("click", () => isolate(i));
+    partsEl.appendChild(li); p.li = li;
+  });
+}
+function setVisible(p, v) { p.visible = v; p.object.visible = v; p.li.classList.toggle("hidden", !v); }
+function isolate(i) {
+  const onlyThis = parts.every((p, k) => p.visible === (k === i));
+  parts.forEach((p, k) => setVisible(p, onlyThis ? true : k === i));
+}
+function explodeAll() { parts.forEach((p) => p.offset.copy(p.dir).multiplyScalar(p.radius * 0.35)); }
+function resetAll() { parts.forEach((p) => { p.offset.set(0, 0, 0); setVisible(p, true); }); }
+let labelsOn = false;
+function applyParts() {
+  parts.forEach((p) => p.object.position.copy(p.basePos).add(p.offset));
+}
+
+// ---------- loading files ----------
+const gltfLoader = new GLTFLoader(), stlLoader = new STLLoader();
+async function loadFiles(files) {
+  const list = Array.from(files);
+  if (!list.length) return;
+  setStatus("Loading model…");
+  try {
+    const stls = list.filter((f) => /\.stl$/i.test(f.name));
+    const glb = list.find((f) => /\.(glb|gltf)$/i.test(f.name));
+    if (glb) {
+      const url = URL.createObjectURL(glb);
+      const gltf = await gltfLoader.loadAsync(url);
+      URL.revokeObjectURL(url);
+      registerModel(gltf.scene, glb.name);
+    } else if (stls.length) {
+      const root = new THREE.Group();
+      for (const f of stls) {
+        const geo = stlLoader.parse(await f.arrayBuffer());
+        geo.computeVertexNormals();
+        const mesh = new THREE.Mesh(geo); mesh.name = f.name.replace(/\.stl$/i, "").replace(/[_-]+/g, " ");
+        root.add(mesh);
+      }
+      registerModel(root, stls.length === 1 ? stls[0].name : `${stls.length} STL segments`);
+    } else {
+      setStatus("That file type isn't supported. Use .glb, .gltf or .stl."); return;
+    }
+    setStatus("");
+  } catch (err) {
+    console.error(err);
+    setStatus("Couldn't read that model. Check the file and try again.");
+  }
+}
+$("loadBtn").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", (e) => loadFiles(e.target.files));
+addEventListener("dragover", (e) => { e.preventDefault(); document.body.classList.add("dragging"); });
+addEventListener("dragleave", () => document.body.classList.remove("dragging"));
+addEventListener("drop", (e) => { e.preventDefault(); document.body.classList.remove("dragging"); loadFiles(e.dataTransfer.files); });
+
+$("explodeBtn").addEventListener("click", explodeAll);
+$("resetBtn").addEventListener("click", resetAll);
+$("labelsBtn").addEventListener("click", () => (labelsOn = !labelsOn));
+addEventListener("keydown", (e) => {
+  if (e.key === "e" || e.key === "E") explodeAll();
+  if (e.key === "r" || e.key === "R") resetAll();
+  if (e.key === "l" || e.key === "L") labelsOn = !labelsOn;
+  if (e.key === "b" || e.key === "B") beatOn = !beatOn;
+  if (e.key === "ArrowUp") bpm = Math.min(180, bpm + 5);
+  if (e.key === "ArrowDown") bpm = Math.max(30, bpm - 5);
+});
+
+// mouse click on a part isolates it
+const raycaster = new THREE.Raycaster();
+renderer.domElement.addEventListener("click", (e) => {
+  const ndc = new THREE.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  const hit = pickPart(ndc);
+  if (hit >= 0) isolate(hit);
+});
+function pickPart(ndc) {
+  raycaster.setFromCamera(ndc, camera);
+  const meshes = parts.filter((p) => p.visible).flatMap((p) => p.meshes);
+  const hits = raycaster.intersectObjects(meshes, false);
+  if (hits.length) return hits[0].object.userData.partIndex;
+  // fall back to nearest projected centre
+  let best = -1, bestD = GRAB_RADIUS_PX;
+  const px = ((ndc.x + 1) / 2) * innerWidth, py = ((1 - ndc.y) / 2) * innerHeight;
+  parts.forEach((p, i) => {
+    if (!p.visible) return;
+    const w = partWorldCentre(p).project(camera);
+    const d = Math.hypot(((w.x + 1) / 2) * innerWidth - px, ((1 - w.y) / 2) * innerHeight - py);
+    if (d < bestD) { bestD = d; best = i; }
+  });
+  return best;
+}
+function partWorldCentre(p) {
+  return model.localToWorld(p.center.clone().add(p.offset));
+}
+
+// ---------- hand tracking ----------
+let landmarker = null, lastVideoTime = -1, hands = [];
+async function startCamera() {
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 1280, height: 720 }, audio: false });
+  video.srcObject = stream;
+  await new Promise((r) => (video.onloadedmetadata = r));
+  await video.play();
+}
+async function startTracking() {
+  const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  landmarker = await HandLandmarker.createFromOptions(vision, {
+    baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task", delegate: "GPU" },
+    runningMode: "VIDEO", numHands: 2,
+  });
+}
+function readHands() {
+  if (!landmarker || video.readyState < 2 || video.currentTime === lastVideoTime) return;
+  lastVideoTime = video.currentTime;
+  const res = landmarker.detectForVideo(video, performance.now());
+  hands = (res.landmarks || []).map((lm) => {
+    const m = lm.map((p) => ({ x: 1 - p.x, y: p.y }));   // mirror to match what the user sees
+    const palmIdx = [0, 5, 9, 13, 17];
+    let px = 0, py = 0; for (const k of palmIdx) { px += m[k].x; py += m[k].y; }
+    px /= palmIdx.length; py /= palmIdx.length;
+    const size = Math.hypot(m[0].x - m[9].x, m[0].y - m[9].y) || 1;
+    const pinchDist = Math.hypot(m[4].x - m[8].x, m[4].y - m[8].y) / size;
+    return { lm: m, palm: { x: px, y: py }, pinchPt: { x: (m[4].x + m[8].x) / 2, y: (m[4].y + m[8].y) / 2 }, pinch: pinchDist < PINCH_THRESHOLD };
+  });
+}
+function videoRect() {
+  const vw = video.videoWidth || 16, vh = video.videoHeight || 9;
+  const s = Math.max(innerWidth / vw, innerHeight / vh);
+  const dw = vw * s, dh = vh * s;
+  return { ox: (innerWidth - dw) / 2, oy: (innerHeight - dh) / 2, dw, dh };
+}
+function toNDC(pt) {   // normalised video coords -> NDC on the window
+  const r = videoRect();
+  const sx = r.ox + pt.x * r.dw, sy = r.oy + pt.y * r.dh;
+  return new THREE.Vector2((sx / innerWidth) * 2 - 1, -(sy / innerHeight) * 2 + 1);
+}
+function drawHands() {
+  handCtx.clearRect(0, 0, handCanvas.width, handCanvas.height);
+  if (!hands.length) return;
+  const r = videoRect(), dpr = Math.min(devicePixelRatio, 2);
+  handCtx.save(); handCtx.scale(dpr, dpr); handCtx.lineWidth = 1;
+  for (const h of hands) {
+    const P = h.lm.map((p) => [r.ox + p.x * r.dw, r.oy + p.y * r.dh]);
+    handCtx.strokeStyle = h.pinch ? "rgba(255,170,170,0.9)" : "rgba(255,255,255,0.55)";
+    handCtx.beginPath();
+    for (const cn of HandLandmarker.HAND_CONNECTIONS) { handCtx.moveTo(...P[cn.start]); handCtx.lineTo(...P[cn.end]); }
+    handCtx.stroke();
+    handCtx.fillStyle = handCtx.strokeStyle;
+    for (const [x, y] of P) { handCtx.beginPath(); handCtx.arc(x, y, 2, 0, Math.PI * 2); handCtx.fill(); }
+  }
+  handCtx.restore();
+}
+
+// ---------- gestures ----------
+const state = { rotX: 0, rotY: 0, targetRotX: 0, targetRotY: 0, scale: 1, targetScale: 1 };
+const grab = { part: -1, depth: 0, prev: null };
+const tmpV = new THREE.Vector3(), tmpQ = new THREE.Quaternion();
+
+function applyGestures(dt) {
+  const pinching = hands.find((h) => h.pinch);
+  const open = hands.filter((h) => !h.pinch);
+
+  // grab / drag with a pinching hand
+  if (pinching && parts.length) {
+    const ndc = toNDC(pinching.pinchPt);
+    if (grab.part < 0) {
+      const i = pickPart(ndc);
+      if (i >= 0) {
+        grab.part = i;
+        grab.depth = partWorldCentre(parts[i]).project(camera).z;
+        grab.prev = null;
+        parts[i].meshes.forEach((m) => m.material.emissive && m.material.emissive.setHex(0x335566));
+        parts[i].li.classList.add("grabbed");
+      }
+    }
+    if (grab.part >= 0) {
+      const now = new THREE.Vector3(ndc.x, ndc.y, grab.depth).unproject(camera);
+      if (grab.prev) {
+        const delta = now.clone().sub(grab.prev);
+        // world delta -> model-local delta (undo group rotation and both scales)
+        group.getWorldQuaternion(tmpQ);
+        delta.applyQuaternion(tmpQ.invert());
+        delta.divideScalar(group.scale.x * model.scale.x);
+        parts[grab.part].offset.add(delta);
+      }
+      grab.prev = now;
+    }
+  } else if (grab.part >= 0) {
+    parts[grab.part].meshes.forEach((m) => m.material.emissive && m.material.emissive.setHex(0x000000));
+    parts[grab.part].li.classList.remove("grabbed");
+    grab.part = -1; grab.prev = null;
+  }
+
+  // rotate with open hands; scale with two hands
+  if (open.length) {
+    let cx = open[0].palm.x, cy = open[0].palm.y;
+    if (hands.length >= 2) {
+      cx = (hands[0].palm.x + hands[1].palm.x) / 2; cy = (hands[0].palm.y + hands[1].palm.y) / 2;
+      const d = Math.hypot(hands[0].palm.x - hands[1].palm.x, hands[0].palm.y - hands[1].palm.y);
+      state.targetScale = THREE.MathUtils.clamp(THREE.MathUtils.mapLinear(d, 0.15, 0.65, 0.55, 1.8), 0.4, 2.2);
+    }
+    if (grab.part < 0) {
+      state.targetRotY = (cx - 0.5) * Math.PI * 1.8;
+      state.targetRotX = (cy - 0.5) * Math.PI * 0.9;
+    }
+  }
+  state.rotX += (state.targetRotX - state.rotX) * Math.min(1, dt * 6);
+  state.rotY += (state.targetRotY - state.rotY) * Math.min(1, dt * 6);
+  state.scale += (state.targetScale - state.scale) * Math.min(1, dt * 5);
+}
+
+function lubdub(t) {
+  const period = 60 / bpm, p = (t % period) / period;
+  const bump = (c, a, w) => a * Math.exp(-(((p - c) / w) ** 2));
+  return bump(0, 1, 0.06) + bump(1, 1, 0.06) + bump(0.3, 0.5, 0.07);
+}
+
+function updateLabels() {
+  parts.forEach((p, i) => {
+    const show = p.visible && (labelsOn || i === grab.part);
+    p.label.classList.toggle("hidden", !show);
+    if (!show) return;
+    const w = partWorldCentre(p).project(camera);
+    if (w.z > 1) { p.label.classList.add("hidden"); return; }
+    p.label.style.left = ((w.x + 1) / 2) * innerWidth + "px";
+    p.label.style.top = ((1 - w.y) / 2) * innerHeight + "px";
+  });
+}
+
+// ---------- main loop ----------
+function resize() {
+  const dpr = Math.min(devicePixelRatio, 2);
+  renderer.setSize(innerWidth, innerHeight, false);
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  handCanvas.width = innerWidth * dpr; handCanvas.height = innerHeight * dpr;
+}
+addEventListener("resize", resize); resize();
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const t = now / 1000;
+  readHands();
+  if (model) applyGestures(dt);
+  applyParts();
+  drawHands();
+  fresnelUniformsAll.forEach((u) => (u.time.value = t));
+  const beat = beatOn ? 1 + BEAT_AMOUNT * lubdub(t) : 1;
+  group.rotation.set(state.rotX, state.rotY, 0);
+  group.scale.setScalar(state.scale * beat);
+  orbit.update();
+  if (model) updateLabels();
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+registerModel(buildSchematicHeart(), "Schematic model · hologram");
+requestAnimationFrame(frame);
+
+(async () => {
+  try {
+    await startCamera();
+    setStatus("Loading hand tracking…");
+    await startTracking();
+    setStatus("");
+  } catch (err) {
+    console.error(err);
+    if (err && (err.name === "NotAllowedError" || err.name === "NotFoundError")) {
+      setStatus("Camera blocked. Allow camera access for this page in the address bar, then reload. Mouse controls still work.");
+    } else {
+      setStatus("Couldn't load hand tracking. Check your internet connection and reload. Mouse controls still work.");
+    }
+  }
+})();
+</script>
+</body>
+</html>

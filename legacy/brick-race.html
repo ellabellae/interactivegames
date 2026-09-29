@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Brick Race</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --ink: #16213a; --panel: rgba(255,255,255,0.88); --grid: rgba(22,33,58,0.18); --p1: #ff8a00; --p2: #2f80ed; --good: #2ecc71; --cell: 34px;
+    box-sizing: border-box; }
+  *, *::before, *::after { box-sizing: inherit; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0c1a2e; color: var(--ink); font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif; font-size: 17px; }
+  #video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); filter: brightness(0.75) saturate(0.9); }
+  #hands { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
+  .divider { position: fixed; top: 0; bottom: 0; left: 50%; width: 3px; background: rgba(255,255,255,0.55); z-index: 2; }
+
+  .top { position: fixed; top: env(safe-area-inset-top, 0px); left: 0; right: 0; z-index: 10; display: flex; justify-content: center; gap: 12px; padding: 12px; pointer-events: none; }
+  .top > * { pointer-events: auto; }
+  .pill { background: var(--panel); border-radius: 999px; padding: 8px 16px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  button, select { font: inherit; font-weight: 600; color: var(--ink); background: #fff; border: 2px solid var(--grid); border-radius: 999px; padding: 8px 16px; cursor: pointer; }
+  button.go { background: var(--good); border-color: var(--good); color: #10331f; }
+  button:focus-visible, select:focus-visible { outline: 3px solid var(--p2); outline-offset: 2px; }
+
+  .zone { position: fixed; top: 0; bottom: 0; width: 50%; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 70px 12px 20px; }
+  .zone.p1 { left: 0; } .zone.p2 { right: 0; }
+  .who { background: var(--panel); border-radius: 999px; padding: 6px 16px; font-weight: 700; font-size: 18px; display: flex; gap: 10px; align-items: center; }
+  .who i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+  .p1 .who i { background: var(--p1); } .p2 .who i { background: var(--p2); }
+  .who span { font-weight: 600; opacity: 0.7; }
+  .board { position: relative; background: rgba(255,255,255,0.82); border: 3px solid rgba(255,255,255,0.9); border-radius: 12px; touch-action: none; user-select: none;
+    background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: var(--cell) var(--cell); background-position: -1px -1px; }
+  .p1 .board { box-shadow: 0 0 0 4px var(--p1); } .p2 .board { box-shadow: 0 0 0 4px var(--p2); }
+  .ghost { position: absolute; border: 2px dashed rgba(22,33,58,0.4); border-radius: 5px; pointer-events: none; }
+  .ghost::after { content: ""; position: absolute; inset: 0; border-radius: 3px; background: var(--c); opacity: 0.2; }
+  .ghost.hidecolor::after { background: transparent; } .ghost.done { display: none; }
+  .tray { background: var(--panel); border-radius: 14px; padding: 10px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 100%; min-height: 60px; touch-action: none; }
+  .slot { height: var(--cell); display: flex; align-items: center; }
+
+  .brick { position: relative; height: var(--cell); width: calc(var(--cell) * var(--w)); border-radius: 5px; background: var(--c); flex: none;
+    box-shadow: inset 0 -5px 0 rgba(0,0,0,0.22), inset 0 2px 0 rgba(255,255,255,0.35), 0 2px 0 rgba(0,0,0,0.18); cursor: grab; }
+  .brick .studs { position: absolute; left: 0; right: 0; top: 3px; display: grid; grid-template-columns: repeat(var(--w), 1fr); justify-items: center; }
+  .brick .studs i { width: calc(var(--cell) * 0.42); height: calc(var(--cell) * 0.42); border-radius: 50%; background: var(--c); box-shadow: inset 0 -3px 0 rgba(0,0,0,0.22), inset 0 2px 0 rgba(255,255,255,0.4); }
+  .brick.dragging { position: fixed; z-index: 50; pointer-events: none; transform: scale(1.08) rotate(-2deg); box-shadow: 0 12px 24px rgba(0,0,0,0.35); }
+  .brick.set { position: absolute; cursor: default; }
+  .brick.pop { animation: pop 300ms ease; } .brick.nope { animation: nope 260ms ease; }
+  @keyframes pop { 0% { transform: scale(1.3); } 100% { transform: scale(1); } }
+  @keyframes nope { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+  .bing { position: absolute; z-index: 60; font-weight: 700; font-size: 22px; color: var(--ink); pointer-events: none; animation: rise 700ms ease forwards; text-shadow: 0 2px 0 #fff; }
+  @keyframes rise { 0% { opacity: 1; transform: translate(-50%, 0) } 100% { opacity: 0; transform: translate(-50%, -48px) } }
+  @media (prefers-reduced-motion: reduce) { .brick.pop, .brick.nope, .bing { animation: none; } }
+
+  .overlay { position: fixed; inset: 0; z-index: 100; display: none; place-items: center; background: rgba(12,26,46,0.6); padding: 20px; text-align: center; }
+  .overlay.on { display: grid; }
+  .overlay > div { background: #fff; border-radius: 22px; padding: 26px 32px; max-width: 460px; }
+  .overlay h2 { font-size: 34px; margin: 0 0 8px; } .overlay p { margin: 0 0 14px; color: #4b5a70; }
+  .overlay .big { font-size: 96px; font-weight: 700; line-height: 1; margin: 6px 0 10px; }
+  canvas.confetti { position: fixed; inset: 0; pointer-events: none; z-index: 90; width: 100%; height: 100%; }
+  #status { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 20; background: var(--panel); border-radius: 999px; padding: 6px 14px; font-size: 14px; }
+  #status.hidden { display: none; }
+</style>
+</head>
+<body>
+<video id="video" autoplay muted playsinline></video>
+<div class="divider"></div>
+<canvas id="hands"></canvas>
+
+<div class="top">
+  <div class="pill"><select id="setSel" aria-label="Choose what to build"></select><label><input type="checkbox" id="hard"> Hide colors</label></div>
+  <div class="pill" id="clock">0:00</div>
+  <button class="go" id="start">Start race</button>
+</div>
+
+<div class="zone p1"><div class="who"><i></i>Player 1 <span id="s1">0 / 0</span></div><div class="board" id="board1"></div><div class="tray" id="tray1"></div></div>
+<div class="zone p2"><div class="who"><i></i>Player 2 <span id="s2">0 / 0</span></div><div class="board" id="board2"></div><div class="tray" id="tray2"></div></div>
+
+<div id="status">Starting camera…</div>
+<div class="overlay" id="countdown"><div><p>Get your hands up, one player on each side.</p><div class="big" id="countNum">3</div></div></div>
+<div class="overlay" id="winner"><div><h2 id="winTitle"></h2><p id="winText"></p><button class="go" id="again">Race again</button></div></div>
+<canvas class="confetti" id="confetti"></canvas>
+
+<script type="module">
+import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+// ---------- pieces ----------
+const C = { red: "#e0332b", blue: "#2d6cdf", yellow: "#f6c324", green: "#3aa655", white: "#f4f4f2", black: "#3a3a3c", orange: "#ff8a00", gray: "#9aa5b1", tan: "#e5c79a", pink: "#ff6fa8" };
+const SETS = {
+  "Rocket": [[5,0,2,"red"],[4,1,4,"red"],[4,2,4,"white"],[4,3,2,"blue"],[6,3,2,"white"],[4,4,4,"white"],[4,5,2,"white"],[6,5,2,"blue"],[4,6,4,"white"],[3,7,1,"red"],[4,7,4,"red"],[8,7,1,"red"],[2,8,2,"red"],[4,8,4,"gray"],[8,8,2,"red"],[4,9,1,"orange"],[5,9,2,"yellow"],[7,9,1,"orange"]],
+  "House": [[5,0,2,"red"],[4,1,4,"red"],[3,2,6,"red"],[2,3,8,"red"],[1,4,10,"red"],[2,5,2,"tan"],[4,5,2,"blue"],[6,5,2,"tan"],[8,5,2,"blue"],[2,6,8,"tan"],[2,7,2,"tan"],[4,7,2,"blue"],[6,7,2,"tan"],[8,7,2,"tan"],[2,8,3,"tan"],[5,8,2,"orange"],[7,8,3,"tan"],[0,9,3,"green"],[3,9,2,"tan"],[5,9,2,"orange"],[7,9,2,"tan"],[9,9,3,"green"]],
+  "Robot": [[5,0,1,"yellow"],[6,0,1,"yellow"],[4,1,4,"gray"],[4,2,1,"gray"],[5,2,1,"blue"],[6,2,1,"blue"],[7,2,1,"gray"],[4,3,4,"gray"],[5,4,2,"black"],[2,5,2,"gray"],[4,5,4,"blue"],[8,5,2,"gray"],[2,6,1,"gray"],[4,6,1,"blue"],[5,6,2,"red"],[7,6,1,"blue"],[9,6,1,"gray"],[2,7,1,"yellow"],[4,7,4,"blue"],[9,7,1,"yellow"],[4,8,2,"gray"],[6,8,2,"gray"],[3,9,3,"black"],[6,9,3,"black"]],
+  "Dog": [[1,1,1,"tan"],[2,2,3,"tan"],[1,3,1,"black"],[2,3,2,"tan"],[4,3,1,"black"],[2,4,3,"tan"],[10,3,1,"tan"],[9,4,2,"tan"],[3,5,6,"tan"],[3,6,2,"tan"],[5,6,2,"pink"],[7,6,2,"tan"],[3,7,6,"tan"],[3,8,1,"tan"],[8,8,1,"tan"],[3,9,1,"black"],[8,9,1,"black"],[5,9,2,"green"]],
+};
+const COLS = 12, ROWS = 10;
+
+// ---------- sound ----------
+let audio = null;
+function ensureAudio() { if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === "suspended") audio.resume(); }
+function tone(f, start, dur, type = "sine", gain = 0.25) {
+  const o = audio.createOscillator(), g = audio.createGain(); o.type = type; o.frequency.setValueAtTime(f, audio.currentTime + start);
+  g.gain.setValueAtTime(0, audio.currentTime + start); g.gain.linearRampToValueAtTime(gain, audio.currentTime + start + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + start + dur);
+  o.connect(g).connect(audio.destination); o.start(audio.currentTime + start); o.stop(audio.currentTime + start + dur + 0.05);
+}
+const bing = () => audio && (tone(1046, 0, 0.5), tone(1568, 0.06, 0.6));
+const bonk = () => audio && tone(160, 0, 0.18, "triangle", 0.2);
+const tick = () => audio && tone(660, 0, 0.12, "square", 0.08);
+const fanfare = () => audio && ([523, 659, 784, 1046].forEach((f, i) => tone(f, i * 0.12, 0.5)), tone(1318, 0.5, 0.9));
+
+// ---------- game ----------
+const $ = (id) => document.getElementById(id);
+let cell = 34, running = false, startTime = 0, clockTimer = null;
+const players = [0, 1].map((p) => ({ p, board: $(`board${p + 1}`), tray: $(`tray${p + 1}`), blueprint: [], placed: 0, grab: null, cursor: null, pinch: false, pinchFrames: 0, releaseFrames: 0 }));
+
+function brickEl(b) {
+  const el = document.createElement("div"); el.className = "brick";
+  el.style.setProperty("--w", b[2]); el.style.setProperty("--c", C[b[3]]);
+  el.innerHTML = `<div class="studs">${"<i></i>".repeat(b[2])}</div>`;
+  el.dataset.w = b[2]; el.dataset.color = b[3]; return el;
+}
+function setup() {
+  const bricks = SETS[$("setSel").value];
+  cell = Math.max(22, Math.min(34, Math.floor((innerWidth / 2 - 40) / COLS)));
+  document.documentElement.style.setProperty("--cell", cell + "px");
+  players.forEach((pl) => {
+    pl.board.innerHTML = ""; pl.tray.innerHTML = ""; pl.placed = 0; pl.grab = null;
+    pl.board.style.width = COLS * cell + "px"; pl.board.style.height = ROWS * cell + "px";
+    pl.blueprint = bricks.map((b) => ({ x: b[0], y: b[1], w: b[2], color: b[3], done: false }));
+    pl.blueprint.forEach((b) => {
+      const g = document.createElement("div"); g.className = "ghost" + ($("hard").checked ? " hidecolor" : ""); g.style.setProperty("--c", C[b.color]);
+      g.style.left = b.x * cell + "px"; g.style.top = b.y * cell + "px"; g.style.width = b.w * cell + "px"; g.style.height = cell + "px";
+      b.ghost = g; pl.board.appendChild(g);
+    });
+    const deck = bricks.slice(); for (let i = deck.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [deck[i], deck[k]] = [deck[k], deck[i]]; }
+    deck.forEach((b) => { const s = document.createElement("div"); s.className = "slot"; const el = brickEl(b); el.dataset.player = pl.p; s.appendChild(el); pl.tray.appendChild(s); });
+  });
+  updateScores(); $("clock").textContent = "0:00";
+}
+function updateScores() { players.forEach((pl) => ($(`s${pl.p + 1}`).textContent = `${pl.placed} / ${pl.blueprint.length}`)); }
+function clockTick() { const s = Math.floor((Date.now() - startTime) / 1000); $("clock").textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
+
+// pick up a brick (from a hand or a pointer)
+function pickUp(pl, el, cx, cy) {
+  if (!running || pl.grab || !el || el.classList.contains("set") || +el.dataset.player !== pl.p) return;
+  const r = el.getBoundingClientRect();
+  const ph = document.createElement("div"); ph.className = "brick"; ph.style.setProperty("--w", el.dataset.w); ph.style.visibility = "hidden";
+  el.parentNode.insertBefore(ph, el); el.classList.add("dragging"); document.body.appendChild(el);
+  pl.grab = { el, ph, offX: cx - r.left, offY: cy - r.top }; moveGrab(pl, cx, cy);
+}
+function moveGrab(pl, cx, cy) { pl.grab.el.style.left = (cx - pl.grab.offX) + "px"; pl.grab.el.style.top = (cy - pl.grab.offY) + "px"; }
+function dropGrab(pl, cx, cy) {
+  const g = pl.grab; if (!g) return; pl.grab = null;
+  const el = g.el, br = pl.board.getBoundingClientRect();
+  const left = cx - g.offX - br.left, top = cy - g.offY - br.top;
+  const x = Math.round(left / cell), y = Math.round(top / cell), w = +el.dataset.w, color = el.dataset.color;
+  const target = pl.blueprint.find((b) => !b.done && b.x === x && b.y === y && b.w === w && b.color === color);
+  el.classList.remove("dragging"); el.style.left = ""; el.style.top = "";
+  if (target) {
+    target.done = true; target.ghost.classList.add("done"); g.ph.remove();
+    el.classList.add("set", "pop"); el.style.left = x * cell + "px"; el.style.top = y * cell + "px"; pl.board.appendChild(el);
+    pl.placed++; updateScores(); bing();
+    const t = document.createElement("div"); t.className = "bing"; t.textContent = "Bing!"; t.style.left = (x + w / 2) * cell + "px"; t.style.top = y * cell - 6 + "px";
+    pl.board.appendChild(t); setTimeout(() => t.remove(), 750);
+    if (pl.placed === pl.blueprint.length) finish(pl);
+  } else {
+    g.ph.replaceWith(el); el.classList.add("nope"); setTimeout(() => el.classList.remove("nope"), 300);
+    if (left > -cell && top > -cell && left < br.width && top < br.height) bonk();
+  }
+}
+function brickAt(pl, cx, cy) {
+  let best = null, bestD = 28;   // generous: a pinch near a brick counts
+  for (const el of pl.tray.querySelectorAll(".brick")) {
+    if (el.style.visibility === "hidden") continue;
+    const r = el.getBoundingClientRect();
+    const dx = Math.max(r.left - cx, 0, cx - r.right), dy = Math.max(r.top - cy, 0, cy - r.bottom), d = Math.hypot(dx, dy);
+    if (d < bestD) { bestD = d; best = el; }
+  }
+  return best;
+}
+
+// ---------- pointer fallback (mouse / touch still work) ----------
+const pointerGrabs = new Map();
+document.addEventListener("pointerdown", (e) => {
+  const el = e.target.closest(".brick"); if (!el) return; ensureAudio();
+  const pl = players[+el.dataset.player]; if (pl.grab) return;
+  pickUp(pl, el, e.clientX, e.clientY); if (pl.grab) { pointerGrabs.set(e.pointerId, pl); e.preventDefault(); }
+});
+document.addEventListener("pointermove", (e) => { const pl = pointerGrabs.get(e.pointerId); if (pl && pl.grab) moveGrab(pl, e.clientX, e.clientY); });
+const endPointer = (e) => { const pl = pointerGrabs.get(e.pointerId); if (!pl) return; pointerGrabs.delete(e.pointerId); dropGrab(pl, e.clientX, e.clientY); };
+document.addEventListener("pointerup", endPointer); document.addEventListener("pointercancel", endPointer);
+
+// ---------- race flow ----------
+function startRace() {
+  ensureAudio(); setup(); running = false;
+  const ov = $("countdown"); ov.classList.add("on"); let n = 3; $("countNum").textContent = n; tick();
+  const iv = setInterval(() => {
+    n--; if (n > 0) { $("countNum").textContent = n; tick(); return; }
+    clearInterval(iv); $("countNum").textContent = "Go!"; tone(880, 0, 0.4, "square", 0.1);
+    setTimeout(() => { ov.classList.remove("on"); running = true; startTime = Date.now(); clearInterval(clockTimer); clockTimer = setInterval(clockTick, 500); }, 500);
+  }, 800);
+}
+function finish(winner) {
+  running = false; clearInterval(clockTimer); clockTick(); fanfare(); confetti();
+  const other = players[1 - winner.p];
+  $("winTitle").textContent = `Player ${winner.p + 1} wins!`;
+  $("winText").textContent = `${$("setSel").value} built in ${$("clock").textContent}. Player ${other.p + 1} had ${other.placed} of ${other.blueprint.length} bricks placed.`;
+  players.forEach((pl) => { if (pl.grab) { const g = pl.grab; pl.grab = null; g.el.classList.remove("dragging"); g.el.style.left = ""; g.el.style.top = ""; g.ph.replaceWith(g.el); } });
+  setTimeout(() => $("winner").classList.add("on"), 900);
+}
+function confetti() {
+  const cv = $("confetti"), ctx = cv.getContext("2d");
+  cv.width = innerWidth * devicePixelRatio; cv.height = innerHeight * devicePixelRatio; ctx.scale(devicePixelRatio, devicePixelRatio);
+  const cols = Object.values(C), bits = Array.from({ length: 140 }, () => ({ x: Math.random() * innerWidth, y: -20 - Math.random() * 200, vx: (Math.random() - 0.5) * 3, vy: 2 + Math.random() * 3, s: 6 + Math.random() * 8, c: cols[Math.floor(Math.random() * cols.length)], r: Math.random() * Math.PI }));
+  let frames = 0;
+  (function loop() { ctx.clearRect(0, 0, innerWidth, innerHeight);
+    bits.forEach((b) => { b.x += b.vx; b.y += b.vy; b.r += 0.08; ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.r); ctx.fillStyle = b.c; ctx.fillRect(-b.s / 2, -b.s / 3, b.s, b.s * 0.66); ctx.restore(); });
+    if (++frames < 220) requestAnimationFrame(loop); else ctx.clearRect(0, 0, innerWidth, innerHeight); })();
+}
+
+// ---------- hand tracking: one hand per side of the screen ----------
+const video = $("video"), handCanvas = $("hands"), hctx = handCanvas.getContext("2d");
+let landmarker = null, lastVideoTime = -1;
+async function startCamera() {
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 1280, height: 720 }, audio: false });
+  video.srcObject = stream; await new Promise((r) => (video.onloadedmetadata = r)); await video.play();
+}
+async function startTracking() {
+  const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  landmarker = await HandLandmarker.createFromOptions(vision, {
+    baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task", delegate: "GPU" },
+    runningMode: "VIDEO", numHands: 2,
+  });
+}
+function videoRect() {
+  const vw = video.videoWidth || 16, vh = video.videoHeight || 9, s = Math.max(innerWidth / vw, innerHeight / vh);
+  return { ox: (innerWidth - vw * s) / 2, oy: (innerHeight - vh * s) / 2, dw: vw * s, dh: vh * s };
+}
+function readHands() {
+  if (!landmarker || video.readyState < 2 || video.currentTime === lastVideoTime) return null;
+  lastVideoTime = video.currentTime;
+  const res = landmarker.detectForVideo(video, performance.now()), r = videoRect();
+  return (res.landmarks || []).map((lm) => {
+    const m = lm.map((p) => ({ x: r.ox + (1 - p.x) * r.dw, y: r.oy + p.y * r.dh }));   // mirrored, in screen pixels
+    const size = Math.hypot(m[0].x - m[9].x, m[0].y - m[9].y) || 1;
+    const pinchDist = Math.hypot(m[4].x - m[8].x, m[4].y - m[8].y) / size;
+    return { pt: { x: (m[4].x + m[8].x) / 2, y: (m[4].y + m[8].y) / 2 }, palmX: m[9].x, pinchDist, lm: m };
+  });
+}
+function frame() {
+  const hands = readHands();
+  if (hands) {
+    hctx.clearRect(0, 0, handCanvas.width, handCanvas.height);
+    const dpr = Math.min(devicePixelRatio, 2); hctx.save(); hctx.scale(dpr, dpr);
+    players.forEach((pl) => {
+      // the hand on this player's half of the screen controls this player
+      const mine = hands.filter((h) => (h.palmX < innerWidth / 2) === (pl.p === 0));
+      const h = mine[0];
+      if (!h) { pl.cursor = null; pl.pinchFrames = 0; if (++pl.releaseFrames > 12 && pl.grab) dropGrab(pl, -999, -999); return; }
+      pl.releaseFrames = 0;
+      // smooth the cursor and use hysteresis so a wobbly pinch doesn't flicker
+      pl.cursor = pl.cursor ? { x: pl.cursor.x + (h.pt.x - pl.cursor.x) * 0.5, y: pl.cursor.y + (h.pt.y - pl.cursor.y) * 0.5 } : { ...h.pt };
+      const wantPinch = pl.pinch ? h.pinchDist < 0.42 : h.pinchDist < 0.3;
+      if (wantPinch) { pl.pinchFrames++; } else { pl.pinchFrames = 0; }
+      if (!pl.pinch && pl.pinchFrames >= 2) { pl.pinch = true; pickUp(pl, brickAt(pl, pl.cursor.x, pl.cursor.y), pl.cursor.x, pl.cursor.y); }
+      if (pl.pinch && !wantPinch) { pl.pinch = false; dropGrab(pl, pl.cursor.x, pl.cursor.y); }
+      if (pl.grab && pl.pinch) moveGrab(pl, pl.cursor.x, pl.cursor.y);
+      // draw the hand and a cursor ring in the player's colour
+      const col = pl.p === 0 ? "#ff8a00" : "#2f80ed";
+      hctx.strokeStyle = col; hctx.lineWidth = 2; hctx.globalAlpha = 0.6; hctx.beginPath();
+      for (const cn of HandLandmarker.HAND_CONNECTIONS) { hctx.moveTo(h.lm[cn.start].x, h.lm[cn.start].y); hctx.lineTo(h.lm[cn.end].x, h.lm[cn.end].y); }
+      hctx.stroke(); hctx.globalAlpha = 1;
+      hctx.beginPath(); hctx.arc(pl.cursor.x, pl.cursor.y, pl.pinch ? 10 : 16, 0, Math.PI * 2);
+      hctx.lineWidth = 4; hctx.strokeStyle = "#fff"; hctx.stroke(); hctx.strokeStyle = col; hctx.lineWidth = 2; hctx.stroke();
+      if (pl.pinch) { hctx.fillStyle = col; hctx.fill(); }
+    });
+    hctx.restore();
+  }
+  requestAnimationFrame(frame);
+}
+function resize() { const dpr = Math.min(devicePixelRatio, 2); handCanvas.width = innerWidth * dpr; handCanvas.height = innerHeight * dpr; if (!running) setup(); }
+addEventListener("resize", resize);
+
+// ---------- wiring ----------
+Object.keys(SETS).forEach((k) => { const o = document.createElement("option"); o.textContent = k; $("setSel").appendChild(o); });
+$("start").addEventListener("click", startRace);
+$("again").addEventListener("click", () => { $("winner").classList.remove("on"); const s = $("setSel"); s.selectedIndex = (s.selectedIndex + 1) % s.options.length; startRace(); });
+$("hard").addEventListener("change", () => players.forEach((pl) => pl.blueprint.forEach((b) => b.ghost.classList.toggle("hidecolor", $("hard").checked))));
+resize(); requestAnimationFrame(frame);
+(async () => {
+  try { await startCamera(); $("status").textContent = "Loading hand tracking…"; await startTracking(); $("status").classList.add("hidden"); }
+  catch (err) { console.error(err); $("status").textContent = err && err.name === "NotAllowedError" ? "Camera blocked. Allow camera access for this page and reload. Mouse and touch still work." : "Hand tracking didn't load. Check the internet connection and reload. Mouse and touch still work."; }
+})();
+</script>
+</body>
+</html>
