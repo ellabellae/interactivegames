@@ -16,7 +16,7 @@ import { HAND_CONNECTIONS, createSlots, createTracker, isCameraBlocked, loadSett
 const settings = loadSettings();
 const V = settings.viewer;
 const MODEL_SIZE = 2.3;        // models are normalised to this many world units across
-let bpm = 70, beatOn = true;
+let bpm = 70, beatOn = false;   // whole-model pulse; off by default so the model holds still for study (B toggles)
 const BEAT_AMOUNT = 0.025;
 
 // ---------- DOM ----------
@@ -74,7 +74,7 @@ const LOOKS = {
   },
 };
 const LOOK_KEY = "heart-hands:viewer-look";
-let look = LOOKS[(() => { try { return localStorage.getItem(LOOK_KEY); } catch { return null; } })()] ?? LOOKS.hologram;
+let look = LOOKS[(() => { try { return localStorage.getItem(LOOK_KEY); } catch { return null; } })()] ?? LOOKS.flat;   // flat by default: opaque parts don't flicker when they overlap
 
 function colorFor(name, i) {
   const n = name.toLowerCase();
