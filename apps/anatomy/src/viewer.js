@@ -307,7 +307,16 @@ addEventListener("keydown", (e) => {
 
 // mouse click on a part isolates it
 const raycaster = new THREE.Raycaster();
+// A drag (to rotate) ends with a click event too; only a press that barely
+// moved counts as clicking a part. Before this, every rotation hid all parts
+// except whichever one the pointer ended on.
+const CLICK_SLOP_PX = 5;
+let pressAt = null;
+renderer.domElement.addEventListener("pointerdown", (e) => { pressAt = { x: e.clientX, y: e.clientY }; });
 renderer.domElement.addEventListener("click", (e) => {
+  const moved = pressAt ? Math.hypot(e.clientX - pressAt.x, e.clientY - pressAt.y) : 0;
+  pressAt = null;
+  if (moved > CLICK_SLOP_PX) return;
   const ndc = new THREE.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
   const hit = pickPart(ndc);
   if (hit >= 0) isolate(hit);
