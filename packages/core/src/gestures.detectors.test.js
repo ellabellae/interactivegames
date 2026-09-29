@@ -1,6 +1,6 @@
 // @ts-check
 import { describe, expect, it } from "vitest";
-import { createChop, createFlick, createStir } from "./gestures.js";
+import { createChop, createDetector, createFlick, createShake, createStir } from "./gestures.js";
 import { STANDARD } from "./settings.js";
 import { legacyKitchen } from "../test/legacy-kitchen-oracle.js";
 import { atVideoRate, circles, oscillate, randomWalk, sweep } from "../test/paths.js";
@@ -106,5 +106,42 @@ describe("flick", () => {
   });
   it.each(Object.entries(PARITY_PATHS))("matches legacy kitchen-race frame by frame: %s", (_, path) => {
     expect(feed(createFlick(G.flick), path)).toEqual(feedLegacy("flick", path));
+  });
+});
+
+describe("shake", () => {
+  it("counts every direction change beyond travelPx", () => {
+    expect(sum(feed(createShake(G.shake), oscillate({ axis: "x", amp: 12, cycles: 10 }).slice(8)))).toBeGreaterThanOrEqual(19);
+  });
+  it("ignores tremor-sized wiggles", () => {
+    expect(sum(feed(createShake(G.shake), oscillate({ axis: "x", amp: 5, cycles: 10 })))).toBe(0);
+  });
+  it("counts nothing when not holding (pt = null)", () => {
+    const det = createShake(G.shake);
+    expect(sum(oscillate({ axis: "x", amp: 20, cycles: 10 }).map((f) => det.update(null, TARGET, f.dt)))).toBe(0);
+  });
+  it.each(Object.entries(PARITY_PATHS))("matches legacy kitchen-race frame by frame: %s", (_, path) => {
+    expect(feed(createShake(G.shake), path)).toEqual(feedLegacy("shake", path));
+  });
+  it("matches legacy when not holding", () => {
+    const path = randomWalk({ seed: 9 });
+    const det = createShake(G.shake);
+    expect(path.map((f) => det.update(null, TARGET, f.dt))).toEqual(feedLegacy("shake", path, TARGET, false));
+  });
+});
+
+describe("parity paths", () => {
+  // Guard against a vacuous parity test: every detector must actually count
+  // on the shared paths, otherwise "matches legacy" could just mean "both 0".
+  it.each(/** @type {const} */ (["stir", "chop", "flick", "shake"]))("exercise %s with real counts", (kind) => {
+    const total = Object.values(PARITY_PATHS).reduce((n, p) => n + sum(feedLegacy(kind, p)), 0);
+    expect(total).toBeGreaterThan(5);
+  });
+});
+
+describe("createDetector", () => {
+  it("builds each kind from settings and rejects unknown kinds", () => {
+    for (const k of /** @type {const} */ (["stir", "chop", "flick", "shake"])) expect(typeof createDetector(k, G).update).toBe("function");
+    expect(() => createDetector(/** @type {any} */ ("wave"), G)).toThrow(/Unknown gesture/);
   });
 });

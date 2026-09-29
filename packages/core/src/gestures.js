@@ -189,3 +189,38 @@ export function createFlick(cfg) {
     reset() { prevY = null; cool = 0; },
   };
 }
+
+/**
+ * Shake: side to side over the target while holding something. Counts on
+ * every direction change after more than travelPx of horizontal travel.
+ * The caller passes pt = null whenever nothing is held.
+ * From legacy/kitchen-race.html, case "shake" (same turning-point quirk as chop).
+ * @param {{ travelPx: number }} cfg
+ * @returns {Detector}
+ */
+export function createShake(cfg) {
+  const rev = createReversal("x", cfg.travelPx, () => true);
+  return {
+    update: (pt, target) => rev.update(pt && target && isNear(pt, target) ? pt : null),
+    progress: () => 0,
+    reset: () => rev.reset(),
+  };
+}
+
+/** @typedef {"stir" | "chop" | "flick" | "shake"} GestureKind */
+
+/**
+ * Build a detector by name from the profile's gesture settings.
+ * @param {GestureKind} kind
+ * @param {import("./settings.js").Settings["gestures"]} gestures
+ * @returns {Detector}
+ */
+export function createDetector(kind, gestures) {
+  switch (kind) {
+    case "stir": return createStir(gestures.stir);
+    case "chop": return createChop(gestures.chop);
+    case "flick": return createFlick(gestures.flick);
+    case "shake": return createShake(gestures.shake);
+    default: throw new Error(`Unknown gesture kind: ${kind}`);
+  }
+}
