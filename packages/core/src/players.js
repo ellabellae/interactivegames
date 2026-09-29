@@ -13,7 +13,7 @@
 import { createCursor, createPinch } from "./gestures.js";
 
 /**
- * @typedef {import("./tracking.js").Hand} Hand
+ * @typedef {import("./tracking.js").Hand} TrackedHand
  * @typedef {"split" | "shared" | "solo"} SlotMode
  * @typedef {object} SlotInput
  * @property {number | null} x        cursor position, null when there is no input
@@ -22,7 +22,7 @@ import { createCursor, createPinch } from "./gestures.js";
  * @property {boolean} pressed        down started this frame
  * @property {boolean} released       down ended this frame (x/y may be null if the hand was lost)
  * @property {"hand" | "pointer" | null} source
- * @property {Hand | null} hand       the tracked hand this video frame, for drawing
+ * @property {TrackedHand | null} hand       the tracked hand this video frame, for drawing
  */
 
 /**
@@ -38,20 +38,20 @@ export function createSlots({ mode, settings, width = () => innerWidth }) {
     pinch: createPinch(settings.pinch),
     cursor: createCursor(settings.cursor),
     lostFrames: 0,
-    /** @type {Hand | null} */ hand: null,
+    /** @type {TrackedHand | null} */ hand: null,
     /** @type {{ x: number, y: number, down: boolean } | null} */ handInput: null,
     /** @type {{ id: number, x: number, y: number, down: boolean } | null} */ pointer: null,
     wasDown: false,
   }));
 
-  /** @param {Hand[]} hands @returns {(Hand | null)[]} one entry per slot */
+  /** @param {TrackedHand[]} hands @returns {(TrackedHand | null)[]} one entry per slot */
   function assign(hands) {
     if (mode === "split") {
       return slots.map((s) => hands.find((h) => (h.sideX < width() / 2) === (s.index === 0)) ?? null);
     }
     // shared / solo: each slot takes the hand nearest its last cursor; slots
     // with no history then take the remaining hands left to right.
-    /** @type {(Hand | null)[]} */ const out = slots.map(() => null);
+    /** @type {(TrackedHand | null)[]} */ const out = slots.map(() => null);
     const free = [...hands];
     for (const s of slots) {
       const c = s.cursor.value;
@@ -61,7 +61,7 @@ export function createSlots({ mode, settings, width = () => innerWidth }) {
       out[s.index] = free.splice(best, 1)[0];
     }
     free.sort((a, b) => a.sideX - b.sideX);
-    for (const s of slots) if (!out[s.index] && free.length) out[s.index] = /** @type {Hand} */ (free.shift());
+    for (const s of slots) if (!out[s.index] && free.length) out[s.index] = /** @type {TrackedHand} */ (free.shift());
     return out;
   }
 
@@ -72,7 +72,7 @@ export function createSlots({ mode, settings, width = () => innerWidth }) {
     /**
      * Feed the hands from one new video frame (call only when tracker.read()
      * returned non-null, as the originals did).
-     * @param {Hand[]} hands
+     * @param {TrackedHand[]} hands
      */
     updateHands(hands) {
       const mine = assign(hands);

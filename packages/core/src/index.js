@@ -1,4 +1,8 @@
 // @ts-check
-// Public entry point for the shared layer. Modules are added here as they
-// are extracted from the prototypes in legacy/ (see step 2 of the plan).
+// Public entry point for the shared layer.
 export * from "./cdn.js";
+export * from "./settings.js";
+export * from "./gestures.js";
+export * from "./tracking.js";
+export * from "./players.js";
+export * from "./audio.js";

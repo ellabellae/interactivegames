@@ -8,13 +8,13 @@ import { HAND_LANDMARKER_MODEL, TASKS_VISION_WASM } from "./cdn.js";
 export const HAND_CONNECTIONS = HandLandmarker.HAND_CONNECTIONS;
 
 /**
- * @typedef {{ x: number, y: number }} Point
+ * @typedef {import("./gestures.js").Point} ScreenPoint
  * @typedef {object} Hand
- * @property {Point[]} lm        21 landmarks in screen px, mirrored to match the video
- * @property {Point[]} lmNorm    same, in mirrored 0..1 video coordinates
- * @property {Point} pt          pinch point (midway between thumb and index tips), px
- * @property {Point} palm        centre of wrist + four knuckles, px
- * @property {Point} palmNorm    same, 0..1 video coordinates (heart viewer rotation)
+ * @property {ScreenPoint[]} lm        21 landmarks in screen px, mirrored to match the video
+ * @property {ScreenPoint[]} lmNorm    same, in mirrored 0..1 video coordinates
+ * @property {ScreenPoint} pt          pinch point (midway between thumb and index tips), px
+ * @property {ScreenPoint} palm        centre of wrist + four knuckles, px
+ * @property {ScreenPoint} palmNorm    same, 0..1 video coordinates (heart viewer rotation)
  * @property {number} sideX      x of the middle knuckle, px (which half of the screen the hand is on)
  * @property {number} pinchDist  thumb-index distance / hand size (wrist to middle knuckle)
  */
@@ -41,7 +41,7 @@ export function coverRect(vw, vh, ww, wh) {
 export function toHand(raw, rect) {
   const lmNorm = raw.map((p) => ({ x: 1 - p.x, y: p.y }));
   const lm = lmNorm.map((p) => ({ x: rect.ox + p.x * rect.dw, y: rect.oy + p.y * rect.dh }));
-  const avg = (/** @type {Point[]} */ pts) => ({ x: PALM.reduce((s, k) => s + pts[k].x, 0) / PALM.length, y: PALM.reduce((s, k) => s + pts[k].y, 0) / PALM.length });
+  const avg = (/** @type {ScreenPoint[]} */ pts) => ({ x: PALM.reduce((s, k) => s + pts[k].x, 0) / PALM.length, y: PALM.reduce((s, k) => s + pts[k].y, 0) / PALM.length });
   const size = Math.hypot(lm[0].x - lm[9].x, lm[0].y - lm[9].y) || 1;
   return {
     lm, lmNorm,
