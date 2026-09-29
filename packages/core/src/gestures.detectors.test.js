@@ -57,34 +57,55 @@ describe("stir", () => {
   });
 });
 
+/** Oscillation with a fast small tremor on top, on the same axis. */
+const withTremor = (/** @type {{ pt: {x:number,y:number} | null, dt: number }[]} */ path, /** @type {"x"|"y"} */ axis, amp = 6, period = 4) =>
+  path.map((f, i) => ({ ...f, pt: f.pt && { ...f.pt, [axis]: f.pt[axis] + amp * Math.sin((2 * Math.PI * i) / period) } }));
+
 describe("chop", () => {
-  it("counts once per down-stroke when travel exceeds travelPx", () => {
-    // amplitude 20 = 40px peak to peak > 22px; first reversal only sets the reference
-    expect(sum(feed(createChop(G.chop), oscillate({ axis: "y", amp: 20, cycles: 10 })))).toBeGreaterThanOrEqual(9);
+  const chops = (/** @type {number} */ amp, cycles = 10) => oscillate({ axis: "y", amp, cycles });
+  it("counts one per down-stroke longer than travelPx", () => {
+    // 10 cycles starting and ending mid-stroke = 9 full down-strokes + two half strokes
+    expect(sum(feed(createChop(G.chop), chops(20)))).toBe(9);    // 40px strokes
+    expect(sum(feed(createChop(G.chop), chops(20, 11).slice(8)))).toBe(10);   // starting at the top: 10 full
   });
-  it("ignores small movements (tremor-sized)", () => {
-    expect(sum(feed(createChop(G.chop), oscillate({ axis: "y", amp: 8, cycles: 10 })))).toBe(0);
+  it("counts the same wherever the first stroke starts (fixes the prototype's 0/10 case)", () => {
+    for (const amp of [12, 14, 16, 20]) {                         // 24-40px strokes, all over the 22px threshold
+      const fromMid = sum(feed(createChop(G.chop), chops(amp)));
+      const fromTop = sum(feed(createChop(G.chop), chops(amp).slice(8)));
+      expect(fromMid).toBeGreaterThanOrEqual(9);
+      expect(Math.abs(fromMid - fromTop)).toBeLessThanOrEqual(1);
+    }
+  });
+  it("prototype comparison: the old rule gave 0/10 for 30px chops started mid-stroke", () => {
+    expect(sum(feedLegacy("chop", chops(15)))).toBe(0);
+    expect(sum(feed(createChop(G.chop), chops(15)))).toBeGreaterThanOrEqual(9);
+  });
+  it("ignores strokes shorter than travelPx, however many", () => {
+    expect(sum(feed(createChop(G.chop), chops(10, 30)))).toBe(0);   // 20px strokes
+  });
+  it("ignores tremor on its own", () => {
+    expect(sum(feed(createChop(G.chop), withTremor(chops(0), "y", 8)))).toBe(0);
+  });
+  it("tremor during real chops doesn't split or add strokes", () => {
+    expect(sum(feed(createChop(G.chop), withTremor(chops(25), "y", 6)))).toBe(sum(feed(createChop(G.chop), chops(25))));
   });
   it("ignores side-to-side movement", () => {
     expect(sum(feed(createChop(G.chop), oscillate({ axis: "x", amp: 40, cycles: 10 })))).toBe(0);
   });
   it("lower travelPx accepts smaller chops", () => {
-    const fromTop = oscillate({ axis: "y", amp: 8, cycles: 10 }).slice(8);
-    expect(sum(feed(createChop(G.chop), fromTop))).toBe(0);
-    expect(sum(feed(createChop({ travelPx: 10 }), fromTop))).toBeGreaterThan(0);
+    expect(sum(feed(createChop({ travelPx: 10 }), chops(8)))).toBeGreaterThanOrEqual(9);
   });
-  // KNOWN LEGACY QUIRK, kept for parity with kitchen-race (owner decision
-  // pending). Travel is measured from the last *counted* turning point, and
-  // before the first count that is wherever the hand entered the target. So
-  // 30px chops count every time if the first stroke starts at the top, and
-  // never if it starts mid-stroke. If this is fixed, flip these expectations.
-  it("legacy quirk: the same 30px chops count or not depending on where they start", () => {
-    const chops = oscillate({ axis: "y", amp: 15, cycles: 10 });
-    expect(sum(feed(createChop(G.chop), chops.slice(8)))).toBe(10);   // starts at a peak
-    expect(sum(feed(createChop(G.chop), chops))).toBe(0);             // starts mid-stroke
+  it("big strokes count the same as the prototype (within one)", () => {
+    for (const amp of [20, 30, 40]) {
+      const path = chops(amp).slice(8);
+      expect(Math.abs(sum(feed(createChop(G.chop), path)) - sum(feedLegacy("chop", path)))).toBeLessThanOrEqual(1);
+    }
   });
-  it.each(Object.entries(PARITY_PATHS))("matches legacy kitchen-race frame by frame: %s", (_, path) => {
-    expect(feed(createChop(G.chop), path)).toEqual(feedLegacy("chop", path));
+  it("leaving the target ends the stroke", () => {
+    const det = createChop(G.chop);
+    const path = chops(20);
+    const counts = path.map((f, i) => det.update(i % 20 < 10 ? f.pt : null, TARGET, f.dt));   // in and out every 10 frames
+    expect(sum(counts)).toBeLessThan(sum(feed(createChop(G.chop), path)));
   });
 });
 
@@ -110,23 +131,29 @@ describe("flick", () => {
 });
 
 describe("shake", () => {
-  it("counts every direction change beyond travelPx", () => {
-    expect(sum(feed(createShake(G.shake), oscillate({ axis: "x", amp: 12, cycles: 10 }).slice(8)))).toBeGreaterThanOrEqual(19);
+  const shakes = (/** @type {number} */ amp, cycles = 10) => oscillate({ axis: "x", amp, cycles });
+  it("counts every sideways stroke longer than travelPx, both directions", () => {
+    expect(sum(feed(createShake(G.shake), shakes(12)))).toBeGreaterThanOrEqual(19);   // 24px strokes
+  });
+  it("counts the same wherever the first stroke starts", () => {
+    const fromMid = sum(feed(createShake(G.shake), shakes(9)));                       // 18px strokes
+    const fromSide = sum(feed(createShake(G.shake), shakes(9).slice(8)));
+    expect(fromMid).toBeGreaterThanOrEqual(18);
+    expect(Math.abs(fromMid - fromSide)).toBeLessThanOrEqual(1);
   });
   it("ignores tremor-sized wiggles", () => {
-    expect(sum(feed(createShake(G.shake), oscillate({ axis: "x", amp: 5, cycles: 10 })))).toBe(0);
+    expect(sum(feed(createShake(G.shake), shakes(5)))).toBe(0);
+  });
+  it("tremor during real shakes doesn't add strokes", () => {
+    expect(sum(feed(createShake(G.shake), withTremor(shakes(20), "x", 5)))).toBe(sum(feed(createShake(G.shake), shakes(20))));
   });
   it("counts nothing when not holding (pt = null)", () => {
     const det = createShake(G.shake);
-    expect(sum(oscillate({ axis: "x", amp: 20, cycles: 10 }).map((f) => det.update(null, TARGET, f.dt)))).toBe(0);
+    expect(sum(shakes(20).map((f) => det.update(null, TARGET, f.dt)))).toBe(0);
   });
-  it.each(Object.entries(PARITY_PATHS))("matches legacy kitchen-race frame by frame: %s", (_, path) => {
-    expect(feed(createShake(G.shake), path)).toEqual(feedLegacy("shake", path));
-  });
-  it("matches legacy when not holding", () => {
-    const path = randomWalk({ seed: 9 });
-    const det = createShake(G.shake);
-    expect(path.map((f) => det.update(null, TARGET, f.dt))).toEqual(feedLegacy("shake", path, TARGET, false));
+  it("big strokes count the same as the prototype (within one)", () => {
+    const path = shakes(20).slice(8);
+    expect(Math.abs(sum(feed(createShake(G.shake), path)) - sum(feedLegacy("shake", path)))).toBeLessThanOrEqual(1);
   });
 });
 
