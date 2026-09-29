@@ -1,0 +1,11 @@
+{
+  "name": "@heart-hands/games",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite"
+  },
+  "dependencies": {
+    "@heart-hands/core": "*"
+  }
+}

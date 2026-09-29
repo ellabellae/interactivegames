@@ -18,5 +18,13 @@
     "preview": "vite preview --outDir dist",
     "test": "vitest run",
     "check": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "@mediapipe/tasks-vision": "0.10.14",
+    "@types/three": "0.160.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.1",
+    "vite-plugin-singlefile": "2.3.3",
+    "vitest": "5.0.2"
   }
 }
