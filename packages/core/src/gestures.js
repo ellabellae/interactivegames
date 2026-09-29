@@ -110,3 +110,50 @@ export function createStir(cfg) {
     reset() { lastAng = null; acc = 0; },
   };
 }
+
+/**
+ * Reversal counter shared by chop (vertical) and shake (horizontal): a count
+ * happens when the direction of travel flips after moving more than
+ * `travelPx` since the last counted turning point.
+ * @param {"x" | "y"} axis
+ * @param {number} travelPx
+ * @param {(dir: number) => boolean} countsOn which new direction scores (chop: only downward)
+ */
+function createReversal(axis, travelPx, countsOn) {
+  /** @type {number | null} */ let prev = null;
+  /** @type {number | null} */ let ext = null;
+  let dir = 0;
+  return {
+    /** @param {Point | null} pt  null ends the current stroke */
+    update(pt) {
+      if (!pt) { prev = null; return 0; }
+      const v = pt[axis];
+      let n = 0;
+      if (prev != null) {
+        const d = Math.sign(v - prev);
+        if (d && dir && d !== dir && Math.abs(v - (ext ?? v)) > travelPx) { ext = v; if (countsOn(d)) n = 1; }
+        if (d) dir = d;
+        if (ext == null) ext = v;
+      }
+      prev = v;
+      return n;
+    },
+    reset() { prev = null; ext = null; dir = 0; },
+  };
+}
+
+/**
+ * Chop: up-and-down over the target. Counts on the turn from rising to
+ * falling (screen y increasing) after more than `travelPx` of travel.
+ * From legacy/kitchen-race.html, case "chop".
+ * @param {{ travelPx: number }} cfg
+ * @returns {Detector}
+ */
+export function createChop(cfg) {
+  const rev = createReversal("y", cfg.travelPx, (d) => d > 0);
+  return {
+    update: (pt, target) => rev.update(pt && target && isNear(pt, target) ? pt : null),
+    progress: () => 0,
+    reset: () => rev.reset(),
+  };
+}

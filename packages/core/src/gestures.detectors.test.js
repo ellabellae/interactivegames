@@ -1,6 +1,6 @@
 // @ts-check
 import { describe, expect, it } from "vitest";
-import { createStir } from "./gestures.js";
+import { createChop, createStir } from "./gestures.js";
 import { STANDARD } from "./settings.js";
 import { legacyKitchen } from "../test/legacy-kitchen-oracle.js";
 import { atVideoRate, circles, oscillate, randomWalk, sweep } from "../test/paths.js";
@@ -54,5 +54,36 @@ describe("stir", () => {
   });
   it.each(Object.entries(PARITY_PATHS))("matches legacy kitchen-race frame by frame: %s", (_, path) => {
     expect(feed(createStir(G.stir), path)).toEqual(feedLegacy("stir", path));
+  });
+});
+
+describe("chop", () => {
+  it("counts once per down-stroke when travel exceeds travelPx", () => {
+    // amplitude 20 = 40px peak to peak > 22px; first reversal only sets the reference
+    expect(sum(feed(createChop(G.chop), oscillate({ axis: "y", amp: 20, cycles: 10 })))).toBeGreaterThanOrEqual(9);
+  });
+  it("ignores small movements (tremor-sized)", () => {
+    expect(sum(feed(createChop(G.chop), oscillate({ axis: "y", amp: 8, cycles: 10 })))).toBe(0);
+  });
+  it("ignores side-to-side movement", () => {
+    expect(sum(feed(createChop(G.chop), oscillate({ axis: "x", amp: 40, cycles: 10 })))).toBe(0);
+  });
+  it("lower travelPx accepts smaller chops", () => {
+    const fromTop = oscillate({ axis: "y", amp: 8, cycles: 10 }).slice(8);
+    expect(sum(feed(createChop(G.chop), fromTop))).toBe(0);
+    expect(sum(feed(createChop({ travelPx: 10 }), fromTop))).toBeGreaterThan(0);
+  });
+  // KNOWN LEGACY QUIRK, kept for parity with kitchen-race (owner decision
+  // pending). Travel is measured from the last *counted* turning point, and
+  // before the first count that is wherever the hand entered the target. So
+  // 30px chops count every time if the first stroke starts at the top, and
+  // never if it starts mid-stroke. If this is fixed, flip these expectations.
+  it("legacy quirk: the same 30px chops count or not depending on where they start", () => {
+    const chops = oscillate({ axis: "y", amp: 15, cycles: 10 });
+    expect(sum(feed(createChop(G.chop), chops.slice(8)))).toBe(10);   // starts at a peak
+    expect(sum(feed(createChop(G.chop), chops))).toBe(0);             // starts mid-stroke
+  });
+  it.each(Object.entries(PARITY_PATHS))("matches legacy kitchen-race frame by frame: %s", (_, path) => {
+    expect(feed(createChop(G.chop), path)).toEqual(feedLegacy("chop", path));
   });
 });
