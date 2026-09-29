@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heartbeat</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; background: #14080a; overflow: hidden; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", sans-serif; color: #f6e9e6; }
+
+  #video {
+    position: fixed; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; transform: scaleX(-1); filter: saturate(0.55) brightness(0.6);
+  }
+  #hands, #scene { position: fixed; inset: 0; width: 100%; height: 100%; }
+  #hands { pointer-events: none; }
+
+  .ui { position: fixed; z-index: 10; pointer-events: none; }
+  #title { top: 22px; left: 26px; font-family: "Instrument Serif", Georgia, serif; font-size: 28px; letter-spacing: 0.01em; }
+  #title em { font-style: italic; color: #f4a3a3; }
+  #bpm { top: 26px; right: 26px; font-size: 14px; text-align: right; line-height: 1.5; opacity: 0.85; }
+  #bpm b { font-family: "Instrument Serif", Georgia, serif; font-weight: 400; font-size: 26px; display: block; }
+  #bpm span { font-size: 12px; opacity: 0.6; }
+
+  #legend { bottom: 24px; left: 26px; font-size: 13px; line-height: 1.7; }
+  #legend table { border-collapse: collapse; }
+  #legend td { padding: 0 18px 0 0; vertical-align: top; }
+  #legend td:first-child { opacity: 0.6; }
+
+  #status {
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-family: "Instrument Serif", Georgia, serif; font-size: 22px; text-align: center;
+    background: rgba(20, 8, 10, 0.72); padding: 14px 22px; border-radius: 6px; max-width: 28em;
+  }
+  #status.hidden { display: none; }
+  #back { bottom: 24px; right: 26px; font-size: 13px; pointer-events: auto; color: inherit; opacity: 0.7; }
+</style>
+</head>
+<body>
+
+<video id="video" autoplay muted playsinline></video>
+<canvas id="scene"></canvas>
+<canvas id="hands"></canvas>
+
+<div class="ui" id="title">Heart<em>beat</em></div>
+<div class="ui" id="bpm"><b id="bpmValue">70</b>bpm<br><span>↑ ↓ to change</span></div>
+<div class="ui" id="legend">
+  <table>
+    <tr><td>Move a hand</td><td>rotate</td></tr>
+    <tr><td>Pinch and hold</td><td>charge</td></tr>
+    <tr><td>Release</td><td>burst, then reassemble</td></tr>
+    <tr><td>Two hands apart</td><td>scale</td></tr>
+  </table>
+</div>
+<div class="ui" id="status">Starting camera…</div>
+<a class="ui" id="back" href="./index.html">← Heart anatomy</a>
+
+<script type="module" src="./src/particles.js"></script>
+</body>
+</html>

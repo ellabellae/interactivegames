@@ -8,16 +8,105 @@
 <style>
   html, body { margin: 0; height: 100%; background: #04060c; overflow: hidden; }
   body { font-family: ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", sans-serif; color: #e6f0f6; font-size: 13px; }
-  #scene { position: fixed; inset: 0; width: 100%; height: 100%; }
-  #title { position: fixed; top: 22px; left: 26px; font-family: "Instrument Serif", Georgia, serif; font-size: 28px; }
+
+  #video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); filter: saturate(0.25) brightness(0.32) contrast(1.1); }
+  #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 2;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(4,6,12,0.85) 100%); }
+  #scanlines { position: fixed; inset: 0; pointer-events: none; z-index: 3; opacity: 0.35; mix-blend-mode: overlay;
+    background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.06) 0 1px, rgba(0,0,0,0.12) 1px 3px); }
+  #scene { z-index: 1; } #hands { z-index: 4; }
+  #scene, #hands { position: fixed; inset: 0; width: 100%; height: 100%; }
+  #hands { pointer-events: none; }
+
+  .ui { position: fixed; z-index: 10; }
+  #title { top: 22px; left: 26px; font-family: "Instrument Serif", Georgia, serif; font-size: 28px; pointer-events: none; }
   #title em { font-style: italic; color: #7fd4ff; }
-  #status { position: fixed; bottom: 24px; left: 26px; opacity: 0.6; }
+  #subtitle { top: 56px; left: 27px; opacity: 0.6; pointer-events: none; }
+
+  #panel { top: 22px; right: 22px; width: 220px; background: rgba(6, 10, 20, 0.72); border-radius: 8px; padding: 12px 14px; backdrop-filter: blur(6px); }
+  #panel h2 { font-family: "Instrument Serif", Georgia, serif; font-weight: 400; font-size: 18px; margin: 0 0 8px; }
+  #parts { list-style: none; margin: 0 0 10px; padding: 0; max-height: 46vh; overflow: auto; }
+  #parts li { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: pointer; }
+  #parts li.grabbed { color: #9fe3ff; }
+  #parts .swatch { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  #parts .name { flex: 1; }
+  #parts li.hidden .name { opacity: 0.4; text-decoration: line-through; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; }
+  button { font: inherit; color: inherit; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18); border-radius: 5px; padding: 5px 9px; cursor: pointer; }
+  button:hover { background: rgba(255,255,255,0.18); }
+  button:focus-visible { outline: 2px solid #7fd4ff; outline-offset: 1px; }
+  #loadHint { opacity: 0.55; margin-top: 8px; line-height: 1.4; }
+  #file { display: none; }
+  #panel a { color: inherit; opacity: 0.7; }
+
+  #legend { bottom: 24px; left: 26px; line-height: 1.7; pointer-events: none; }
+  #legend table { border-collapse: collapse; }
+  #legend td { padding: 0 18px 0 0; vertical-align: top; }
+  #legend td:first-child { opacity: 0.6; }
+
+  .label { position: fixed; z-index: 9; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap;
+    padding: 3px 8px; border-radius: 4px; background: rgba(6, 10, 20, 0.78); font-size: 12px; margin-top: -8px; }
+  .label::after { content: ""; position: absolute; left: 50%; bottom: -5px; width: 1px; height: 5px; background: rgba(255,255,255,0.5); }
+  .label.hidden { display: none; }
+
+  #status { top: 50%; left: 50%; transform: translate(-50%, -50%); font-family: "Instrument Serif", Georgia, serif; font-size: 22px; text-align: center;
+    background: rgba(6, 10, 20, 0.72); padding: 14px 22px; border-radius: 6px; max-width: 28em; pointer-events: none; }
+  #status.hidden { display: none; }
+  /* Flat look: the colours of legacy/heart-anatomy.html, applied over the hologram theme. */
+  body.look-flat, html:has(body.look-flat) { background: #14080a; }
+  body.look-flat { color: #f6e9e6; }
+  body.look-flat #video { filter: saturate(0.5) brightness(0.55); }
+  body.look-flat #vignette, body.look-flat #scanlines { display: none; }
+  body.look-flat #title em { color: #f4a3a3; }
+  body.look-flat #panel { background: rgba(20, 8, 10, 0.72); }
+  body.look-flat #parts li.grabbed { color: #ffb3b3; }
+  body.look-flat button:focus-visible { outline-color: #f4a3a3; }
+  body.look-flat .label { background: rgba(20, 8, 10, 0.78); }
+  body.look-flat #status { background: rgba(20, 8, 10, 0.72); }
+  body.look-flat.dragging::after { background: rgba(20, 8, 10, 0.6); }
+  body.dragging::after { content: "Drop a .glb or .stl files"; position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
+    background: rgba(6, 10, 20, 0.6); font-family: "Instrument Serif", Georgia, serif; font-size: 28px; }
 </style>
 </head>
 <body>
+
+<video id="video" autoplay muted playsinline></video>
 <canvas id="scene"></canvas>
-<div id="title">Heart <em>anatomy</em></div>
-<div id="status">Scaffold placeholder. The viewer is ported from legacy/heart-hologram.html in a later step.</div>
-<script type="module" src="./src/placeholder.js"></script>
+<div id="vignette"></div>
+<div id="scanlines"></div>
+<canvas id="hands"></canvas>
+
+<div class="ui" id="title">Heart <em>anatomy</em></div>
+<div class="ui" id="subtitle">Schematic model · hologram</div>
+
+<div class="ui" id="panel">
+  <h2>Parts</h2>
+  <ul id="parts"></ul>
+  <div class="row">
+    <button id="explodeBtn">Explode</button>
+    <button id="resetBtn">Reset</button>
+    <button id="labelsBtn">Labels</button>
+    <button id="lookBtn" aria-label="Switch between hologram and flat look">Look: hologram</button>
+  </div>
+  <div class="row" style="margin-top:6px">
+    <button id="loadBtn">Load model</button>
+    <input id="file" type="file" multiple accept=".glb,.gltf,.stl">
+  </div>
+  <div id="loadHint">One .glb with named parts, or several .stl files (one per structure, e.g. exported from 3D Slicer). Or drop them on the page.</div>
+  <div style="margin-top:8px"><a href="./particles.html">Particle heart demo →</a></div>
+</div>
+
+<div class="ui" id="legend">
+  <table>
+    <tr><td>Open hand</td><td>rotate</td></tr>
+    <tr><td>Pinch on a part</td><td>grab it, move it, release to drop</td></tr>
+    <tr><td>Two hands apart</td><td>scale</td></tr>
+    <tr><td>Mouse</td><td>drag to rotate, scroll to zoom, click a part to isolate</td></tr>
+    <tr><td>Keys</td><td>E explode, R reset, L labels, B beat, V look</td></tr>
+  </table>
+</div>
+<div class="ui" id="status">Starting camera…</div>
+
+<script type="module" src="./src/viewer.js"></script>
 </body>
 </html>

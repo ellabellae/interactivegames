@@ -1,13 +1,16 @@
 {
   // Type checking only. Source stays plain JavaScript; `npm run check` runs tsc
   // with noEmit so a mistyped setting name or wrong argument is caught in CI.
+  // Checking is opt-in per file with a `// @ts-check` first line: all of
+  // packages/core opts in; code ported verbatim from legacy/ (and the legacy
+  // test oracle) does not, so it can stay line-for-line comparable.
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "allowJs": true,
-    "checkJs": true,
+    "checkJs": false,
     "noEmit": true,
     "strict": true,
     "skipLibCheck": true,
