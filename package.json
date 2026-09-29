@@ -1,0 +1,22 @@
+{
+  "name": "heart-hands",
+  "private": true,
+  "type": "module",
+  "description": "Webcam hand-tracking tools: a 3D anatomy viewer for students and gesture games for movement practice.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:anatomy": "npm run dev -w @heart-hands/anatomy",
+    "dev:games": "npm run dev -w @heart-hands/games",
+    "build": "node scripts/build.mjs",
+    "preview": "vite preview --outDir dist",
+    "test": "vitest run",
+    "check": "tsc --noEmit -p ."
+  }
+}
