@@ -1,0 +1,279 @@
+// Particle heart: the first demo. Ported from legacy/heart-particles.html.
+// Drawing and particle physics are unchanged; camera, tracking and pinch now
+// come from @heart-hands/core (standard pinch thresholds, per-hand state).
+import * as THREE from "three";
+import { HAND_CONNECTIONS, createSlots, createTracker, isCameraBlocked, loadSettings, startCamera } from "@heart-hands/core";
+
+// ---------- settings ----------
+const N = 8000;           // particle count
+let bpm = 70;
+const BEAT_AMOUNT = 0.07; // how much the heart swells per beat
+const settings = loadSettings();
+
+// ---------- DOM ----------
+const video = document.getElementById("video");
+const sceneCanvas = document.getElementById("scene");
+const handCanvas = document.getElementById("hands");
+const handCtx = handCanvas.getContext("2d");
+const statusEl = document.getElementById("status");
+const bpmValue = document.getElementById("bpmValue");
+const setStatus = (msg) => { statusEl.textContent = msg; statusEl.classList.toggle("hidden", !msg); };
+
+// ---------- heart geometry ----------
+// Taubin's heart surface. z is "up" in this equation; y is the thin axis.
+// (x² + 9/4·y² + z² − 1)³ − x²·z³ − 9/80·y²·z³ = 0
+function heartF(x, y, z) {
+  const a = x * x + 2.25 * y * y + z * z - 1;
+  return a * a * a - x * x * z * z * z - 0.1125 * y * y * z * z * z;
+}
+function heartGrad(x, y, z, out) {
+  const a = x * x + 2.25 * y * y + z * z - 1;
+  const a2 = 3 * a * a;
+  out[0] = a2 * 2 * x - 2 * x * z * z * z;
+  out[1] = a2 * 4.5 * y - 0.225 * y * z * z * z;
+  out[2] = a2 * 2 * z - 3 * x * x * z * z - 0.3375 * y * y * z * z;
+}
+
+// Sample points on the surface by throwing random points into a box and
+// Newton-projecting them onto f = 0. To use a real anatomical heart later,
+// replace this function with one that samples a GLTF mesh surface
+// (three/addons MeshSurfaceSampler) and returns the same Float32Array layout.
+function buildHeartPoints(n) {
+  const pts = new Float32Array(n * 3);
+  const g = [0, 0, 0];
+  let filled = 0;
+  while (filled < n) {
+    let x = (Math.random() * 2 - 1) * 1.35;
+    let y = (Math.random() * 2 - 1) * 0.85;
+    let z = (Math.random() * 2.7 - 1.3);
+    let ok = false;
+    for (let k = 0; k < 10; k++) {
+      const f = heartF(x, y, z);
+      heartGrad(x, y, z, g);
+      const gg = g[0] * g[0] + g[1] * g[1] + g[2] * g[2];
+      if (gg < 1e-9) break;
+      const s = f / gg;
+      x -= s * g[0]; y -= s * g[1]; z -= s * g[2];
+      if (Math.abs(f) < 1e-4) { ok = true; break; }
+    }
+    if (!ok || Math.abs(x) > 1.4 || Math.abs(y) > 0.9 || z < -1.35 || z > 1.4) continue;
+    // remap: equation z (up) -> three y, equation y (thin) -> three z. Shift so it's centred.
+    pts[filled * 3] = x;
+    pts[filled * 3 + 1] = z - 0.05;
+    pts[filled * 3 + 2] = y;
+    filled++;
+  }
+  return pts;
+}
+
+// ---------- three.js scene ----------
+const renderer = new THREE.WebGLRenderer({ canvas: sceneCanvas, alpha: true, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 50);
+camera.position.set(0, 0, 3.6);
+
+const home = buildHeartPoints(N);
+const pos = new Float32Array(home);
+const vel = new Float32Array(N * 3);
+const colors = new Float32Array(N * 3);
+const c = new THREE.Color();
+for (let i = 0; i < N; i++) {
+  const y = home[i * 3 + 1];
+  // deeper red low down, warmer and lighter at the top, a few bright specks
+  const light = 0.42 + (y + 1.2) / 2.6 * 0.28 + (Math.random() < 0.06 ? 0.25 : 0);
+  c.setHSL(0.985 + Math.random() * 0.02, 0.85, light);
+  colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+}
+
+const geo = new THREE.BufferGeometry();
+geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+function makeSprite() {
+  const cv = document.createElement("canvas"); cv.width = cv.height = 64;
+  const g = cv.getContext("2d");
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, "rgba(255,255,255,1)");
+  grad.addColorStop(0.4, "rgba(255,255,255,0.6)");
+  grad.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = grad; g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(cv);
+}
+const mat = new THREE.PointsMaterial({
+  size: 0.032, sizeAttenuation: true, map: makeSprite(), vertexColors: true,
+  transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending,
+});
+const points = new THREE.Points(geo, mat);
+const group = new THREE.Group();
+group.add(points);
+scene.add(group);
+
+// ---------- interaction state ----------
+const state = {
+  rotX: 0, rotY: 0, targetRotX: 0, targetRotY: 0,
+  scale: 1, targetScale: 1,
+  charge: 0, pinching: false,
+  handsSeen: 0,
+};
+
+function explode(strength) {
+  for (let i = 0; i < N; i++) {
+    const j = i * 3;
+    const hx = home[j], hy = home[j + 1], hz = home[j + 2];
+    const len = Math.hypot(hx, hy, hz) || 1;
+    const k = (3.5 + Math.random() * 3.5) * strength;
+    vel[j] += (hx / len) * k + (Math.random() - 0.5) * 1.5;
+    vel[j + 1] += (hy / len) * k + (Math.random() - 0.5) * 1.5;
+    vel[j + 2] += (hz / len) * k + (Math.random() - 0.5) * 1.5;
+  }
+}
+
+// two bumps per cycle: a strong "lub" and a softer "dub"
+function lubdub(t) {
+  const period = 60 / bpm;
+  const p = (t % period) / period;
+  const bump = (centre, amp, w) => amp * Math.exp(-(((p - centre) / w) ** 2));
+  return bump(0, 1, 0.06) + bump(1, 1, 0.06) + bump(0.3, 0.5, 0.07);
+}
+
+// ---------- hand tracking ----------
+let tracker = null;
+let hands = [];   // { lm (px), palm (0..1), pinch } for the hands seen this frame
+const slots = createSlots({ mode: "shared", settings });
+function readHands() {
+  const seen = tracker?.read();
+  if (seen) slots.updateHands(seen);
+  slots.frame();
+  hands = slots.slots.filter((s) => s.hand).map((s) => ({ lm: s.hand.lm, palm: s.hand.palmNorm, pinch: s.pinch.down }));
+}
+
+// ---------- hand overlay drawing ----------
+function drawHands() {
+  handCtx.clearRect(0, 0, handCanvas.width, handCanvas.height);
+  if (!hands.length) return;
+  const dpr = Math.min(devicePixelRatio, 2);
+  handCtx.save();
+  handCtx.scale(dpr, dpr);
+  handCtx.lineWidth = 1;
+  for (const h of hands) {
+    const P = h.lm.map((p) => [p.x, p.y]);
+    handCtx.strokeStyle = h.pinch ? "rgba(255,170,170,0.9)" : "rgba(255,255,255,0.55)";
+    handCtx.beginPath();
+    for (const [a, b] of HAND_CONNECTIONS.map((cn) => [cn.start, cn.end])) {
+      handCtx.moveTo(P[a][0], P[a][1]); handCtx.lineTo(P[b][0], P[b][1]);
+    }
+    handCtx.stroke();
+    handCtx.fillStyle = handCtx.strokeStyle;
+    for (const [x, y] of P) { handCtx.beginPath(); handCtx.arc(x, y, 2, 0, Math.PI * 2); handCtx.fill(); }
+  }
+  handCtx.restore();
+}
+
+// ---------- gesture logic ----------
+function applyGestures(dt) {
+  state.handsSeen = hands.length;
+  const anyPinch = hands.some((h) => h.pinch);
+
+  if (hands.length >= 1) {
+    let cx, cy;
+    if (hands.length >= 2) {
+      cx = (hands[0].palm.x + hands[1].palm.x) / 2;
+      cy = (hands[0].palm.y + hands[1].palm.y) / 2;
+      const d = Math.hypot(hands[0].palm.x - hands[1].palm.x, hands[0].palm.y - hands[1].palm.y);
+      state.targetScale = THREE.MathUtils.clamp(THREE.MathUtils.mapLinear(d, 0.15, 0.65, 0.55, 1.9), 0.4, 2.2);
+    } else {
+      cx = hands[0].palm.x; cy = hands[0].palm.y;
+    }
+    state.targetRotY = (cx - 0.5) * Math.PI * 1.8;
+    state.targetRotX = (cy - 0.5) * Math.PI * 0.9;
+  } else {
+    // idle: slow turn
+    state.targetRotY += 0.25 * dt;
+  }
+
+  if (anyPinch) {
+    state.charge = Math.min(1, state.charge + dt / 0.9);
+  } else {
+    if (state.pinching && state.charge > 0.15) explode(state.charge);
+    state.charge = Math.max(0, state.charge - dt / 0.25);
+  }
+  state.pinching = anyPinch;
+
+  state.rotX += (state.targetRotX - state.rotX) * Math.min(1, dt * 6);
+  state.rotY += (state.targetRotY - state.rotY) * Math.min(1, dt * 6);
+  state.scale += (state.targetScale - state.scale) * Math.min(1, dt * 5);
+}
+
+// ---------- particle physics ----------
+function stepParticles(t, dt) {
+  const charge = state.charge;
+  const squeeze = 1 - 0.18 * charge;        // pinch pulls particles inward
+  const jitter = 0.018 * (1 - charge);      // and calms the drift
+  const stiffness = 28, damp = Math.exp(-dt * 5.5);
+  for (let i = 0; i < N; i++) {
+    const j = i * 3;
+    const tx = home[j] * squeeze + Math.sin(t * 1.3 + i * 0.37) * jitter;
+    const ty = home[j + 1] * squeeze + Math.cos(t * 1.1 + i * 0.53) * jitter;
+    const tz = home[j + 2] * squeeze + Math.sin(t * 1.7 + i * 0.71) * jitter;
+    vel[j]     = (vel[j]     + (tx - pos[j])     * stiffness * dt) * damp;
+    vel[j + 1] = (vel[j + 1] + (ty - pos[j + 1]) * stiffness * dt) * damp;
+    vel[j + 2] = (vel[j + 2] + (tz - pos[j + 2]) * stiffness * dt) * damp;
+    pos[j] += vel[j] * dt; pos[j + 1] += vel[j + 1] * dt; pos[j + 2] += vel[j + 2] * dt;
+  }
+  geo.attributes.position.needsUpdate = true;
+  mat.size = 0.032 * (1 + 0.5 * charge);
+  mat.opacity = 0.85 + 0.15 * charge;
+}
+
+// ---------- main loop ----------
+function resize() {
+  const dpr = Math.min(devicePixelRatio, 2);
+  renderer.setSize(innerWidth, innerHeight, false);
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  handCanvas.width = innerWidth * dpr; handCanvas.height = innerHeight * dpr;
+}
+addEventListener("resize", resize);
+resize();
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  const t = now / 1000;
+
+  readHands();
+  applyGestures(dt);
+  stepParticles(t, dt);
+  drawHands();
+
+  const beat = 1 + BEAT_AMOUNT * lubdub(t);
+  group.rotation.set(state.rotX, state.rotY, 0);
+  group.scale.setScalar(state.scale * beat);
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+addEventListener("keydown", (e) => {
+  if (e.key === "ArrowUp") bpm = Math.min(180, bpm + 5);
+  if (e.key === "ArrowDown") bpm = Math.max(30, bpm - 5);
+  bpmValue.textContent = bpm;
+});
+
+(async () => {
+  requestAnimationFrame(frame); // heart beats even before the camera is ready
+  try {
+    await startCamera(video);
+    setStatus("Loading hand tracking…");
+    tracker = await createTracker(video);
+    setStatus("");
+  } catch (err) {
+    console.error(err);
+    if (isCameraBlocked(err)) {
+      setStatus("Camera blocked. Allow camera access for this page in the address bar, then reload.");
+    } else {
+      setStatus("Couldn't load hand tracking. Check your internet connection and reload.");
+    }
+  }
+})();
