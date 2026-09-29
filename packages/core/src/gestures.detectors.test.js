@@ -125,8 +125,24 @@ describe("flick", () => {
   it("counts once per cooldown even if the fast move lasts several frames", () => {
     expect(sum(feed(createFlick(G.flick), sweep({ y0: 280, y1: 40, frames: 8 })))).toBe(1);
   });
-  it.each(Object.entries(PARITY_PATHS))("matches legacy kitchen-race frame by frame: %s", (_, path) => {
+  // With a tracked hand there is a point every frame, and then the new
+  // detector must match the prototype exactly. (Paths with dropouts differ on
+  // purpose: see the mouse test below.)
+  const continuous = Object.entries(PARITY_PATHS).map(([k, p]) => /** @type {[string, typeof p]} */ ([k, p.filter((/** @type {{ pt: unknown }} */ f) => f.pt)]));
+  it.each(continuous)("matches legacy kitchen-race frame by frame while a hand is present: %s", (_, path) => {
     expect(feed(createFlick(G.flick), path)).toEqual(feedLegacy("flick", path));
+  });
+  it("cooldown keeps running with no input, so repeated mouse flicks count", () => {
+    // mouse: press, flick fast, release, wait 0.7s with no input, repeat 3 times
+    const gap = Array.from({ length: 42 }, () => ({ pt: null, dt: 1 / 60 }));
+    const one = sweep({ frames: 4, hold: 0 });
+    const path = [...one, ...gap, ...one, ...gap, ...one];
+    expect(sum(feed(createFlick(G.flick), path))).toBe(3);
+    expect(sum(feedLegacy("flick", path))).toBe(1);   // prototype: only the first counted
+  });
+  it("still enforces the cooldown between quick flicks", () => {
+    const one = sweep({ frames: 4, hold: 0 }), gap = Array.from({ length: 6 }, () => ({ pt: null, dt: 1 / 60 }));
+    expect(sum(feed(createFlick(G.flick), [...one, ...gap, ...one]))).toBe(1);
   });
 });
 

@@ -189,11 +189,14 @@ export function createFlick(cfg) {
   let cool = 0;
   return {
     update(pt, target, dt) {
+      // The cooldown runs on time, with or without input. (In the prototype it
+      // only ran while there was a point, so with a mouse, which only gives a
+      // point while the button is down, later flicks were ignored.)
+      if (dt > 0) cool = Math.max(0, cool - dt);
       if (!pt) { prevY = null; return 0; }
       let n = 0;
       if (prevY != null && dt > 0) {
         const vy = (prevY - pt.y) / dt;
-        cool = Math.max(0, cool - dt);
         if (vy > cfg.minSpeedPxPerS && cool === 0 && isNear({ x: pt.x, y: prevY }, target)) { cool = cfg.cooldownS; n = 1; }
       }
       prevY = pt.y;
