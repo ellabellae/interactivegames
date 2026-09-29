@@ -61,3 +61,52 @@ export function createCursor(cfg) {
     reset() { s = null; },
   };
 }
+
+// ---------------------------------------------------------------- detectors
+//
+// Every detector has the same shape:
+//   update(pt, target, dt) -> number of counts this frame (0 or 1)
+//     pt      smoothed cursor in px, or null when there is no input
+//     target  { x, y, r } the gesture must happen over
+//     dt      seconds since the previous call (render frame, clamped)
+//   progress() -> 0..1 toward the next count (for meters)
+//   reset()    -> forget everything (new step, hand lost)
+
+/**
+ * @typedef {object} Detector
+ * @property {(pt: Point | null, target: Target | null, dt: number) => number} update
+ * @property {() => number} progress
+ * @property {() => void} reset
+ */
+
+/**
+ * Stir: circles over the target. Counts once per `turnsPerCount` full turns
+ * of accumulated angle. Leaving the target pauses without losing progress.
+ * From legacy/kitchen-race.html, case "stir".
+ * @param {{ turnsPerCount: number }} cfg
+ * @returns {Detector}
+ */
+export function createStir(cfg) {
+  /** @type {number | null} */
+  let lastAng = null;
+  let acc = 0;
+  const need = () => 2 * Math.PI * cfg.turnsPerCount;
+  return {
+    update(pt, target) {
+      if (!pt || !target || !isNear(pt, target)) { lastAng = null; return 0; }
+      const ang = Math.atan2(pt.y - target.y, pt.x - target.x);
+      let n = 0;
+      if (lastAng != null) {
+        let d = ang - lastAng;
+        if (d > Math.PI) d -= 2 * Math.PI;
+        if (d < -Math.PI) d += 2 * Math.PI;
+        acc += Math.abs(d);
+        if (acc > need()) { acc = 0; n = 1; }
+      }
+      lastAng = ang;
+      return n;
+    },
+    progress: () => Math.min(1, acc / need()),
+    reset() { lastAng = null; acc = 0; },
+  };
+}
