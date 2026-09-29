@@ -1,6 +1,6 @@
 // @ts-check
 import { describe, expect, it } from "vitest";
-import { createChop, createStir } from "./gestures.js";
+import { createChop, createFlick, createStir } from "./gestures.js";
 import { STANDARD } from "./settings.js";
 import { legacyKitchen } from "../test/legacy-kitchen-oracle.js";
 import { atVideoRate, circles, oscillate, randomWalk, sweep } from "../test/paths.js";
@@ -85,5 +85,26 @@ describe("chop", () => {
   });
   it.each(Object.entries(PARITY_PATHS))("matches legacy kitchen-race frame by frame: %s", (_, path) => {
     expect(feed(createChop(G.chop), path)).toEqual(feedLegacy("chop", path));
+  });
+});
+
+describe("flick", () => {
+  it("counts a fast upward sweep that starts over the target", () => {
+    expect(sum(feed(createFlick(G.flick), sweep({ frames: 4 })))).toBe(1);          // 140px in 4 frames ≈ 2100 px/s
+  });
+  it("ignores a slow raise", () => {
+    expect(sum(feed(createFlick(G.flick), sweep({ frames: 40 })))).toBe(0);         // ≈ 210 px/s
+  });
+  it("ignores a fast downward move", () => {
+    expect(sum(feed(createFlick(G.flick), sweep({ y0: 120, y1: 260, frames: 4 })))).toBe(0);
+  });
+  it("ignores a flick that starts outside the target", () => {
+    expect(sum(feed(createFlick(G.flick), sweep({ x: 600, frames: 4 })))).toBe(0);
+  });
+  it("counts once per cooldown even if the fast move lasts several frames", () => {
+    expect(sum(feed(createFlick(G.flick), sweep({ y0: 280, y1: 40, frames: 8 })))).toBe(1);
+  });
+  it.each(Object.entries(PARITY_PATHS))("matches legacy kitchen-race frame by frame: %s", (_, path) => {
+    expect(feed(createFlick(G.flick), path)).toEqual(feedLegacy("flick", path));
   });
 });

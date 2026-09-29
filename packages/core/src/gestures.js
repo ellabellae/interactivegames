@@ -157,3 +157,35 @@ export function createChop(cfg) {
     reset: () => rev.reset(),
   };
 }
+
+/**
+ * Flick: a fast upward move that starts over the target. Counts when upward
+ * speed exceeds minSpeedPxPerS, then waits cooldownS before the next.
+ * From legacy/kitchen-race.html, case "flick".
+ *
+ * Speed is measured per render frame (dt), as in the original. The cursor
+ * only moves when a new video frame arrives, so on a 60 fps screen with a
+ * 30 fps camera the measured speed is roughly double the real hand speed.
+ * The 1100 px/s threshold was tuned with that behaviour, so it is kept.
+ * @param {{ minSpeedPxPerS: number, cooldownS: number }} cfg
+ * @returns {Detector}
+ */
+export function createFlick(cfg) {
+  /** @type {number | null} */ let prevY = null;
+  let cool = 0;
+  return {
+    update(pt, target, dt) {
+      if (!pt) { prevY = null; return 0; }
+      let n = 0;
+      if (prevY != null && dt > 0) {
+        const vy = (prevY - pt.y) / dt;
+        cool = Math.max(0, cool - dt);
+        if (vy > cfg.minSpeedPxPerS && cool === 0 && isNear({ x: pt.x, y: prevY }, target)) { cool = cfg.cooldownS; n = 1; }
+      }
+      prevY = pt.y;
+      return n;
+    },
+    progress: () => 0,
+    reset() { prevY = null; cool = 0; },
+  };
+}
