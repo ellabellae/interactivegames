@@ -48,7 +48,8 @@ const PARTS = {
   "Left anterior descending artery": ["FJ2631", "FJ2632", "FJ2633", "FJ2634", "FJ2635", "FJ2636", "FJ2637", "FJ2638", "FJ2639", "FJ2640", "FJ2641", "FJ2642", "FJ2643", "FJ2644", "FJ2645", "FJ2646", "FJ2647", "FJ2648"],
   "Circumflex artery": ["FJ2649", "FJ2650", "FJ2651", "FJ2652", "FJ2653", "FJ2654"],
   // cardiac veins
-  "Coronary sinus and cardiac veins": ["FJ2655", "FJ2656", "FJ2724", "FJ2731", "FJ2727", "FJ2728", "FJ2729"],
+  "Coronary sinus": ["FJ2655"],
+  "Cardiac veins": ["FJ2656", "FJ2724", "FJ2731", "FJ2727", "FJ2728", "FJ2729"],
   // great vessels (trimmed to the box around the heart)
   "Ascending aorta": ["FJ3413"],
   "Aortic arch": ["FJ3411"],

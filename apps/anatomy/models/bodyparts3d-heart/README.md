@@ -32,8 +32,8 @@ This licence covers the model files only, not the rest of this repository.
 Made by [`scripts/build-heart-model.mjs`](../../../../scripts/build-heart-model.mjs):
 
 - Selected the heart's element pieces and the nearby great vessels, and grouped
-  them into 25 named parts (four chambers, four valves, papillary muscles,
-  coronary arteries by branch, cardiac veins, great vessels). `manifest.json`
+  them into 26 named parts (four chambers, four valves, papillary muscles,
+  coronary arteries by branch, coronary sinus, cardiac veins, great vessels). `manifest.json`
   lists exactly which source pieces went into each part.
 - Trimmed the great vessels to 25 mm around the heart, and the pulmonary
   arteries and veins to 12 mm, since in the source they continue into the
