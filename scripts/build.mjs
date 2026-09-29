@@ -1,8 +1,9 @@
 // Builds every page of every app into dist/ as one self-contained HTML file.
 //
-//   dist/index.html            site/index.html (links to both apps)
-//   dist/anatomy/<page>.html   one file per apps/anatomy/*.html
-//   dist/games/<page>.html     one file per apps/games/*.html
+//   dist/index.html               site/index.html (links to the apps)
+//   dist/anatomy/<page>.html      one file per apps/anatomy/*.html
+//   dist/games/<page>.html        one file per apps/games/*.html
+//   dist/physiology/<page>.html   one file per apps/physiology/*.html
 //
 // Vite is run once per page because inlining everything into one file only
 // works with a single entry point.
@@ -12,7 +13,7 @@ import { join, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
 const dist = join(root, "dist");
-const apps = ["anatomy", "games"];
+const apps = ["anatomy", "games", "physiology"];
 
 await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
