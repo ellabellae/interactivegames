@@ -95,13 +95,40 @@ export const STANDARD = {
   },
 };
 
+/**
+ * For reduced range of motion, slower movement and tremor. Only the values
+ * that differ from STANDARD are listed. Starting points to tune with the
+ * session logs; not clinical settings.
+ * @type {Settings}
+ */
+export const GENTLE = mergeSettings(STANDARD, {
+  id: "gentle",
+  label: "Gentle",
+  tracking: { handLostFrames: 20 },                // more forgiving if the hand leaves the frame briefly
+  pinch: { on: 0.38, off: 0.55, holdFrames: 4 },   // easier to start, much harder to drop by accident, ignores tremor blips
+  cursor: { smoothing: 0.25 },                     // heavier smoothing steadies tremor
+  targets: { padPx: 50, brickGrabPx: 50, brickCellPx: [30, 46], snapCells: 0.8 },   // bigger hit areas
+  gestures: {
+    stir: { turnsPerCount: 0.5 },                  // half a circle counts
+    chop: { travelPx: 12 },                        // smaller strokes count
+    shake: { travelPx: 8 },
+    raise: { travelPx: 60, maxS: 3 },              // replaces flick: lift slowly, no speed needed
+  },
+  game: {
+    repsScale: 0.5,                                // e.g. chop x14 becomes x7
+    tempo: { startBpm: 110, bpmPerStep: 0, maxBpm: 110 },   // calm, never speeds up
+    wrongDrop: "none",                             // a wrong drop just goes back, silently
+    countdownMs: 1200,
+  },
+});
+
 /** @type {Record<string, Settings>} */
-export const PROFILES = { standard: STANDARD };
+export const PROFILES = { standard: STANDARD, gentle: GENTLE };
 
 export const STORAGE_KEY = "heart-hands:settings";
 
 /** @param {unknown} v @returns {v is Record<string, unknown>} */
-const isPlainObject = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+function isPlainObject(v) { return typeof v === "object" && v !== null && !Array.isArray(v); }   // a declaration so GENTLE (above) can use it at load
 
 /**
  * Deep-merge `patch` over `base`. Objects merge key by key; arrays and

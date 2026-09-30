@@ -1,6 +1,6 @@
 // @ts-check
 import { describe, expect, it } from "vitest";
-import { STANDARD, STORAGE_KEY, loadChoice, loadSettings, mergeSettings, resolveSettings, saveChoice } from "./settings.js";
+import { GENTLE, STANDARD, STORAGE_KEY, loadChoice, loadSettings, mergeSettings, resolveSettings, saveChoice } from "./settings.js";
 
 /** In-memory stand-in for localStorage. */
 function memoryStorage(initial = /** @type {Record<string, string>} */ ({})) {
@@ -68,5 +68,41 @@ describe("storage", () => {
   });
   it("maps a removed profile id back to standard", () => {
     expect(loadChoice(memoryStorage({ [STORAGE_KEY]: JSON.stringify({ profileId: "old", overrides: {} }) })).profileId).toBe("standard");
+  });
+});
+
+describe("GENTLE profile", () => {
+  it("has the agreed values", () => {
+    expect(GENTLE.id).toBe("gentle");
+    expect(GENTLE.pinch).toEqual({ on: 0.38, off: 0.55, holdFrames: 4 });
+    expect(GENTLE.cursor.smoothing).toBe(0.25);
+    expect(GENTLE.tracking.handLostFrames).toBe(20);
+    expect(GENTLE.targets).toEqual({ padPx: 50, brickGrabPx: 50, partGrabPx: 110, brickCellPx: [30, 46], snapCells: 0.8 });
+    expect(GENTLE.gestures).toMatchObject({ stir: { turnsPerCount: 0.5 }, chop: { travelPx: 12 }, shake: { travelPx: 8 }, raise: { travelPx: 60, maxS: 3 } });
+    expect(GENTLE.game).toEqual({ repsScale: 0.5, tempo: { startBpm: 110, bpmPerStep: 0, maxBpm: 110 }, wrongDrop: "none", countdownMs: 1200 });
+  });
+  it("is easier than standard on every difficulty threshold", () => {
+    expect(GENTLE.pinch.on).toBeGreaterThan(STANDARD.pinch.on);          // pinch starts further apart
+    expect(GENTLE.pinch.off).toBeGreaterThan(STANDARD.pinch.off);        // and holds further apart
+    expect(GENTLE.cursor.smoothing).toBeLessThan(STANDARD.cursor.smoothing);
+    expect(GENTLE.targets.padPx).toBeGreaterThan(STANDARD.targets.padPx);
+    expect(GENTLE.targets.brickGrabPx).toBeGreaterThan(STANDARD.targets.brickGrabPx);
+    expect(GENTLE.targets.snapCells).toBeGreaterThan(STANDARD.targets.snapCells);
+    expect(GENTLE.gestures.chop.travelPx).toBeLessThan(STANDARD.gestures.chop.travelPx);
+    expect(GENTLE.gestures.shake.travelPx).toBeLessThan(STANDARD.gestures.shake.travelPx);
+    expect(GENTLE.gestures.stir.turnsPerCount).toBeLessThan(STANDARD.gestures.stir.turnsPerCount);
+    expect(GENTLE.game.repsScale).toBeLessThan(STANDARD.game.repsScale);
+  });
+  it("keeps the pinch release wider than the start (hysteresis still works)", () => {
+    expect(GENTLE.pinch.off).toBeGreaterThan(GENTLE.pinch.on);
+  });
+  it("leaves standard unchanged", () => {
+    expect(STANDARD.id).toBe("standard");
+    expect(STANDARD.gestures.raise).toBeNull();
+  });
+  it("can be chosen and saved", () => {
+    const st = memoryStorage();
+    saveChoice({ profileId: "gentle", overrides: {} }, st);
+    expect(loadSettings(st).id).toBe("gentle");
   });
 });
