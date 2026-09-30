@@ -205,5 +205,8 @@ Work happens on a branch per change, with commit messages that explain why
 - The versions of three.js and MediaPipe are pinned in
   `packages/core/src/cdn.js`.
 
-No licence has been chosen for this repository's own code yet, so for now
-all rights are reserved by the author.
+This project's code is released under the [MIT License](LICENSE): anyone
+may use, copy, change and share it, as long as the copyright and licence
+notice are kept. It is provided as is, without warranty. Files that come
+from other sources (for example 3D models) keep their own licence, noted in
+a LICENSE or README next to them.
