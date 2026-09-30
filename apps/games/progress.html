@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Progress</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Colours and type from the games (legacy/kitchen-race.html, brick-race.html). */
+  :root { --ink: #16213a; --panel: rgba(255,255,255,0.94); --p1: #ff8a00; --p2: #2f80ed; --good: #2ecc71; box-sizing: border-box; }
+  *, *::before, *::after { box-sizing: inherit; }
+  html, body { margin: 0; min-height: 100%; background: #0c1a2e; color: var(--ink); font-family: "Fredoka", "Trebuchet MS", system-ui, sans-serif; font-size: 16px; }
+  main { max-width: 1000px; margin: 0 auto; padding: 28px 16px 48px; }
+  h1 { color: #fff; margin: 0 0 14px; }
+  .card { background: var(--panel); border-radius: 22px; padding: 18px 22px; margin-bottom: 14px; }
+  .card p { margin: 0 0 6px; color: #4b5a70; line-height: 1.45; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  button, select { font: inherit; font-weight: 600; color: var(--ink); background: #fff; border: 2px solid rgba(22,33,58,0.2); border-radius: 999px; padding: 8px 16px; cursor: pointer; }
+  button.go { background: var(--good); border-color: var(--good); color: #10331f; }
+  button.danger { border-color: #e0332b; color: #a11d17; }
+  button:focus-visible, select:focus-visible { outline: 3px solid var(--p2); outline-offset: 2px; }
+  a { color: #fff; }
+  .card a { color: var(--p2); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid rgba(22,33,58,0.1); white-space: nowrap; }
+  th { font-weight: 600; color: #4b5a70; }
+  tr.session { cursor: pointer; }
+  tr.session:hover, tr.session:focus-visible { background: rgba(47,128,237,0.08); outline: none; }
+  tr.detail td { background: rgba(22,33,58,0.03); padding: 4px 10px 14px 28px; white-space: normal; }
+  tr.detail table { font-size: 14px; }
+  .muted { color: #4b5a70; }
+  .yes { color: #1b7a43; font-weight: 600; } .no { color: #8a5a00; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Progress</h1>
+  <div class="card">
+    <p><strong>Stored only on this device, in this browser.</strong> Nothing is sent anywhere, and there are no accounts. Clearing the browser's site data deletes this log. Export a CSV to keep a copy or share it.</p>
+    <p>Times and counts are here to notice change over time and to tune settings. They are not a measure of health.</p>
+  </div>
+  <div class="card">
+    <div class="row">
+      <label>Player <select id="playerSel" aria-label="Show sessions for"></select></label>
+      <button class="go" id="exportBtn">Export CSV</button>
+      <button class="danger" id="clearBtn">Delete all sessions</button>
+      <a href="./index.html" style="margin-left:auto">← Games</a>
+    </div>
+  </div>
+  <div class="card">
+    <div id="summary" class="muted" style="margin-bottom:8px"></div>
+    <div class="table-wrap"><table id="sessions"></table></div>
+  </div>
+</main>
+<script type="module" src="./src/progress-page.js"></script>
+</body>
+</html>
