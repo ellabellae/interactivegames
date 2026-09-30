@@ -6,3 +6,4 @@ export * from "./gestures.js";
 export * from "./tracking.js";
 export * from "./players.js";
 export * from "./audio.js";
+export * from "./progress.js";
