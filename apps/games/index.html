@@ -20,6 +20,9 @@
   .profile select { font: inherit; font-weight: 600; color: var(--ink); background: #fff; border: 2px solid rgba(22,33,58,0.2); border-radius: 999px; padding: 6px 14px; }
   .profile select:focus-visible { outline: 3px solid var(--p2); outline-offset: 2px; }
   .profile p { margin: 8px 0 0; color: #4b5a70; font-size: 15px; }
+  .profile input { font: inherit; color: var(--ink); background: #fff; border: 2px solid rgba(22,33,58,0.2); border-radius: 999px; padding: 6px 14px; width: 12em; }
+  .profile input:focus-visible { outline: 3px solid var(--p2); outline-offset: 2px; }
+  .profile + .profile { margin-top: -4px; }
 </style>
 </head>
 <body>
@@ -29,8 +32,13 @@
     <label>Profile <select id="profileSel" aria-label="Profile"></select></label>
     <p id="profileNote"></p>
   </div>
+  <div class="profile">
+    <label>Who's playing? <input id="playerName" maxlength="40" autocomplete="off" placeholder="optional, e.g. initials"></label>
+    <p>Only used to sort sessions on the <a href="./progress.html">Progress</a> page. Stored on this device only.</p>
+  </div>
   <a class="card" href="./kitchen.html"><h2>🍳 Kitchen</h2><p>Crack, stir, chop, shake and flip through a recipe. Two cooks race, one on each side of the screen.</p></a>
   <a class="card" href="./bricks.html"><h2>🧱 Bricks</h2><p>Copy the picture brick by brick. Race on two boards, or build one together.</p></a>
+  <a class="card" href="./progress.html"><h2>📈 Progress</h2><p>Past sessions on this device: times, steps and counts. Export as CSV.</p></a>
   <a class="home" href="../index.html">← Home</a>
 </main>
 <script type="module" src="./src/menu.js"></script>

@@ -9,7 +9,7 @@
 //          build it together. Useful for playing alongside a therapist or
 //          family member.
 //   solo   one board in the middle, one player (any hand), against your best time.
-import { createAudio, createSlots, loadSettings } from "@heart-hands/core";
+import { createAudio, createSession, createSlots, loadPlayer, loadSettings, saveSession } from "@heart-hands/core";
 import { $, confetti, createClock, drawHands, fitCanvas, mmss, mountProfilePicker, recordBest, remembered, runCountdown, startCameraWithStatus } from "./common.js";
 
 const settings = loadSettings();
@@ -104,12 +104,13 @@ function dropGrab(si, cx, cy) {
     target.done = true; target.ghost.classList.add("done"); g.ph.remove();
     el.classList.add("set", "pop"); el.style.left = x * cell + "px"; el.style.top = y * cell + "px"; bd.board.appendChild(el);
     bd.placed++; placedBy[si]++; updateScores(); sfx.bing();
+    session?.brick(si, `${w}x ${color}`);
     const t = document.createElement("div"); t.className = "bing"; t.textContent = "Bing!"; t.style.left = (x + w / 2) * cell + "px"; t.style.top = y * cell - 6 + "px";
     bd.board.appendChild(t); setTimeout(() => t.remove(), 750);
     if (bd.placed === bd.blueprint.length) finish(bd);
   } else {
     g.ph.replaceWith(el); el.classList.add("nope"); setTimeout(() => el.classList.remove("nope"), 300);
-    if (left > -cell && top > -cell && left < br.width && top < br.height) wrongDropSound();
+    if (left > -cell && top > -cell && left < br.width && top < br.height) { wrongDropSound(); session?.miss(si); }
   }
 }
 function brickAt(si, cx, cy) {
@@ -129,6 +130,7 @@ function releaseAll() {
 
 // ---------- input: one slot per player, hand or pointer ----------
 function applyInput(si, inp) {
+  if (running) { session?.input(si, inp.source); if (inp.pressed) session?.pinch(si); }
   if (inp.pressed && inp.x != null) pickUp(si, brickAt(si, inp.x, inp.y), inp.x, inp.y);
   if (inp.released) dropGrab(si, inp.x ?? -999, inp.y ?? -999);   // hand lost: drop off-board, brick goes back
   if (grabs[si] && inp.down && inp.x != null) moveGrab(si, inp.x, inp.y);
@@ -142,11 +144,22 @@ const endPointer = (e) => slots.pointerUp(e.pointerId, e.clientX, e.clientY);
 document.addEventListener("pointerup", endPointer); document.addEventListener("pointercancel", endPointer);
 
 // ---------- race flow ----------
+// ---------- progress log (this device only; see the Progress page) ----------
+let session = null;
+function startSession() {
+  endSession(false);
+  session = createSession({ game: "bricks", mode, detail: $("setSel").value, variant: $("hard").checked ? "hidden" : "colors", settings, slots: slots.count, player: loadPlayer() });
+}
+/** Save the session: completed, or abandoned (restart, mode change, leaving the page). */
+function endSession(completed) { if (session && !session.ended) saveSession(session.end(completed)); session = null; }
+addEventListener("pagehide", () => endSession(false));
+
 function startRace() {
-  audio.ensure(); setup(); slots.reset(); running = false;
-  runCountdown({ tickMs: settings.game.countdownMs, goLabel: "Go!", tick: sfx.tick, go: sfx.go, onGo: () => { running = true; clock.start(); } });
+  endSession(false); audio.ensure(); setup(); slots.reset(); running = false;
+  runCountdown({ tickMs: settings.game.countdownMs, goLabel: "Go!", tick: sfx.tick, go: sfx.go, onGo: () => { running = true; clock.start(); startSession(); } });
 }
 function finish(winner) {
+  endSession(true);
   running = false; clock.stop(); sfx.fanfare(); confetti(Object.values(C));
   if (mode === "coop") {
     $("winTitle").textContent = "Built together!";
@@ -190,7 +203,7 @@ $("modeSel").addEventListener("change", () => {
   const v = $("modeSel").value;
   mode = v === "coop" || v === "solo" ? v : "race";
   modeStore.set(mode);
-  releaseAll(); running = false; clock.stop(); clock.clear();
+  endSession(false); releaseAll(); running = false; clock.stop(); clock.clear();
   slots = createSlots({ mode: slotMode(), settings });
   applyMode(); setup();
 });

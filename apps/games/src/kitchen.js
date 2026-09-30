@@ -2,7 +2,7 @@
 // mini-game. Ported from legacy/kitchen-race.html onto @heart-hands/core:
 // thresholds come from the settings profile, gestures from the shared
 // detectors, input from player slots (hand or mouse/touch).
-import { createAudio, createDetector, createLoop, createSlots, gestureFor, isNear, loadSettings } from "@heart-hands/core";
+import { createAudio, createDetector, createLoop, createSession, createSlots, gestureFor, isNear, loadPlayer, loadSettings, saveSession } from "@heart-hands/core";
 import { $, confetti, createClock, drawHands, fitCanvas, mmss, mountProfilePicker, recordBest, remembered, runCountdown, startCameraWithStatus } from "./common.js";
 
 const settings = loadSettings();
@@ -86,14 +86,28 @@ function setup() {
 /** An element's hit circle: its centre, radius = half its larger side + the profile's padding. */
 function targetOf(el) { if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, r: Math.max(r.width, r.height) / 2 + settings.targets.padPx }; }
 const near = (pt, el) => isNear(pt, targetOf(el));
+// =============== progress log (this device only; see the Progress page) ===============
+let session = null;
+function beginLoggedStep(pl) { const st = pl.recipe[pl.si]; if (st) session?.beginStep(pl.p, { name: st.name, gesture: kindOf(st), need: needFor(st) }); }
+function startSession() {
+  endSession(false);
+  session = createSession({ game: "kitchen", mode: mode.get(), detail: $("recipeSel").value, settings, slots: activePlayers().length, player: loadPlayer() });
+  activePlayers().forEach(beginLoggedStep);
+}
+/** Save the session: completed, or abandoned (restart, mode change, leaving the page). */
+function endSession(completed) { if (session && !session.ended) saveSession(session.end(completed)); session = null; }
+addEventListener("pagehide", () => endSession(false));
+
 function progress(pl) {
   const step = pl.recipe[pl.si], need = needFor(step); pl.count++;
+  session?.rep(pl.p);
   pl.station.querySelector(".meter div").style.width = (100 * pl.count / need) + "%";
   step.sfx();
   if (pl.count >= need) {
     pl.count = 0; pl.si++; dropHeld(pl); sfx.bing(); pop(pl, "Bing!");
     music.bpm = Math.min(tempo.maxBpm, tempo.startBpm + tempo.bpmPerStep * Math.max(...players.map((q) => q.si)));
-    if (pl.si >= pl.recipe.length) finish(pl); else layoutStation(pl);
+    if (pl.si >= pl.recipe.length) { session?.endStep(pl.p); finish(pl); }
+    else { layoutStation(pl); beginLoggedStep(pl); }
   }
 }
 function pop(pl, text) { const t = document.createElement("div"); t.className = "bing"; t.textContent = text; pl.station.appendChild(t); setTimeout(() => t.remove(), 850); }
@@ -105,16 +119,17 @@ function dropHeld(pl) { if (pl.held) { pl.held.remove(); pl.held = null; } }
 function updateGesture(pl, inp, dt) {
   const step = pl.recipe[pl.si]; if (!step || !running) return;
   const pt = inp.x != null ? { x: inp.x, y: inp.y } : null;
+  if (inp.pressed) session?.pinch(pl.p);
   if (pl.held && pt) { pl.held.style.left = pt.x + "px"; pl.held.style.top = pt.y + "px"; }
 
   switch (kindOf(step)) {
     case "pinchdrop":
       if (inp.pressed && near(pt, pl.src)) hold(pl, step.from);
-      if (inp.released && pl.held) { if (near(pt, pl.dst)) { puff(pl, step.from, pt); progress(pl); } dropHeld(pl); }
+      if (inp.released && pl.held) { if (near(pt, pl.dst)) { puff(pl, step.from, pt); progress(pl); } else session?.miss(pl.p); dropHeld(pl); }
       break;
     case "drag":
       if (inp.pressed && near(pt, pl.src)) { hold(pl, step.from); pl.src.style.opacity = 0.25; }
-      if (inp.released && pl.held) { dropHeld(pl); if (near(pt, pl.dst)) progress(pl); else pl.src.style.opacity = 1; }
+      if (inp.released && pl.held) { dropHeld(pl); if (near(pt, pl.dst)) progress(pl); else { pl.src.style.opacity = 1; session?.miss(pl.p); } }
       break;
     case "stir":
       if (pl.detector.update(pt, targetOf(pl.dst), dt)) { progress(pl); puff(pl, "✨", pt); }
@@ -150,16 +165,18 @@ function frame(now) {
   if (hands) slots.updateHands(hands);
   const inputs = slots.frame();
   activePlayers().forEach((pl) => updateGesture(pl, inputs[pl.p], dt));
+  if (running) activePlayers().forEach((pl) => session?.input(pl.p, inputs[pl.p].source));
   drawHands(hctx, slots);
   requestAnimationFrame(frame);
 }
 
 // =============== race flow ===============
 function startRace() {
-  audio.ensure(); setup(); running = false; if (musicOn) music.start();
-  runCountdown({ tickMs: settings.game.countdownMs, goLabel: "Cook!", tick: sfx.tick, go: sfx.go, onGo: () => { running = true; clock.start(); } });
+  endSession(false); audio.ensure(); setup(); running = false; if (musicOn) music.start();
+  runCountdown({ tickMs: settings.game.countdownMs, goLabel: "Cook!", tick: sfx.tick, go: sfx.go, onGo: () => { running = true; clock.start(); startSession(); } });
 }
 function finish(winner) {
+  endSession(true);
   running = false; clock.stop(); music.stop(); sfx.fanfare(); confetti(["#ff8a00", "#2f80ed", "#ffcf3f", "#2ecc71", "#ff6fa8", "#fff"]);
   if (solo()) {
     const dish = $("recipeSel").value, r = recordBest(`kitchen:${dish}:${settings.id}`, clock.seconds);
@@ -186,7 +203,7 @@ function applyMode() {
 mountProfilePicker(/** @type {HTMLSelectElement} */ ($("profileSel")));
 $("modeSel").addEventListener("change", () => {
   mode.set($("modeSel").value === "solo" ? "solo" : "race");
-  running = false; clock.stop(); music.stop();
+  endSession(false); running = false; clock.stop(); music.stop();
   slots = createSlots({ mode: solo() ? "solo" : "split", settings });
   applyMode(); setup();
 });
