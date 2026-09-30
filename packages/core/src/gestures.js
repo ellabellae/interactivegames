@@ -224,7 +224,37 @@ export function createShake(cfg) {
   };
 }
 
-/** @typedef {"stir" | "chop" | "flick" | "shake"} GestureKind */
+/**
+ * Raise: a slow upward lift that starts over the target. Counts when the hand
+ * has risen `travelPx` from a low point that was over the target, within
+ * `maxS` seconds. No speed is needed, so it replaces flick in the gentle
+ * profile. New in this project (not in the prototypes).
+ * @param {{ travelPx: number, maxS: number }} cfg
+ * @returns {Detector}
+ */
+export function createRaise(cfg) {
+  /** @type {{ y: number, t: number, over: boolean }[]} */
+  let samples = [];
+  let clock = 0, best = 0;
+  return {
+    update(pt, target, dt) {
+      clock += Math.max(0, dt);
+      if (!pt) { samples = []; best = 0; return 0; }
+      samples.push({ y: pt.y, t: clock, over: isNear(pt, target) });
+      samples = samples.filter((s) => clock - s.t <= cfg.maxS);
+      // highest point reached above any low point that was over the target
+      const low = samples.reduce((m, s) => (s.over && s.y > m ? s.y : m), -Infinity);
+      const rise = low - pt.y;   // screen y grows downward
+      best = Number.isFinite(rise) ? Math.max(0, rise) : 0;
+      if (rise >= cfg.travelPx) { samples = [{ y: pt.y, t: clock, over: isNear(pt, target) }]; best = 0; return 1; }
+      return 0;
+    },
+    progress: () => Math.min(1, best / cfg.travelPx),
+    reset() { samples = []; best = 0; },
+  };
+}
+
+/** @typedef {"stir" | "chop" | "flick" | "shake" | "raise"} GestureKind */
 
 /**
  * Build a detector by name from the profile's gesture settings.
@@ -238,6 +268,16 @@ export function createDetector(kind, gestures) {
     case "chop": return createChop(gestures.chop);
     case "flick": return createFlick(gestures.flick);
     case "shake": return createShake(gestures.shake);
+    case "raise": if (gestures.raise) return createRaise(gestures.raise); throw new Error("This profile has no raise settings");
     default: throw new Error(`Unknown gesture kind: ${kind}`);
   }
 }
+
+/**
+ * The gesture a step should actually use under a profile: a flick step
+ * becomes a slow raise when the profile defines one (gentle).
+ * @param {GestureKind} kind
+ * @param {import("./settings.js").Settings["gestures"]} gestures
+ * @returns {GestureKind}
+ */
+export const gestureFor = (kind, gestures) => (kind === "flick" && gestures.raise ? "raise" : kind);

@@ -1,6 +1,6 @@
 // @ts-check
 import { describe, expect, it } from "vitest";
-import { createChop, createDetector, createFlick, createShake, createStir } from "./gestures.js";
+import { createChop, createDetector, createFlick, createRaise, createShake, createStir, gestureFor } from "./gestures.js";
 import { STANDARD } from "./settings.js";
 import { legacyKitchen } from "../test/legacy-kitchen-oracle.js";
 import { atVideoRate, circles, oscillate, randomWalk, sweep } from "../test/paths.js";
@@ -186,5 +186,49 @@ describe("createDetector", () => {
   it("builds each kind from settings and rejects unknown kinds", () => {
     for (const k of /** @type {const} */ (["stir", "chop", "flick", "shake"])) expect(typeof createDetector(k, G).update).toBe("function");
     expect(() => createDetector(/** @type {any} */ ("wave"), G)).toThrow(/Unknown gesture/);
+  });
+});
+
+describe("raise (gentle replacement for flick)", () => {
+  const RAISE = { travelPx: 60, maxS: 3 };
+  const lift = (/** @type {number} */ px, /** @type {number} */ seconds, x = 200, y0 = 260) => {
+    const n = Math.round(seconds * 60);
+    return Array.from({ length: n + 1 }, (_, i) => ({ pt: { x, y: y0 - (px * i) / n }, dt: 1 / 60 }));
+  };
+  it("counts a slow lift of travelPx over the target", () => {
+    expect(sum(feed(createRaise(RAISE), lift(70, 2)))).toBe(1);
+  });
+  it("doesn't need speed: a 2.5 s lift counts, where a flick wouldn't", () => {
+    expect(sum(feed(createRaise(RAISE), lift(70, 2.5)))).toBe(1);
+    expect(sum(feed(createFlick(G.flick), lift(70, 2.5)))).toBe(0);
+  });
+  it("ignores a lift that is too small", () => {
+    expect(sum(feed(createRaise(RAISE), lift(40, 1)))).toBe(0);
+  });
+  it("ignores a lift slower than maxS", () => {
+    expect(sum(feed(createRaise(RAISE), lift(70, 5)))).toBe(0);
+  });
+  it("ignores a lift that starts away from the target", () => {
+    expect(sum(feed(createRaise(RAISE), lift(70, 2, 600)))).toBe(0);
+  });
+  it("counts again after lowering and lifting again", () => {
+    const down = lift(-70, 1, 200, 190);   // back down to 260
+    expect(sum(feed(createRaise(RAISE), [...lift(70, 1.5), ...down, ...lift(70, 1.5)]))).toBe(2);
+  });
+  it("tremor on a slow lift doesn't add counts", () => {
+    const shaky = lift(70, 2).map((f, i) => ({ ...f, pt: f.pt && { x: f.pt.x + 4 * Math.sin(i), y: f.pt.y + 4 * Math.sin(i * 1.7) } }));
+    expect(sum(feed(createRaise(RAISE), shaky))).toBe(1);
+  });
+  it("reports progress toward the lift", () => {
+    const r = createRaise(RAISE); feed(r, lift(30, 1));
+    expect(r.progress()).toBeCloseTo(0.5, 1);
+  });
+});
+
+describe("gestureFor", () => {
+  it("swaps flick for raise only when the profile has raise settings", () => {
+    expect(gestureFor("flick", G)).toBe("flick");
+    expect(gestureFor("flick", { ...G, raise: { travelPx: 60, maxS: 3 } })).toBe("raise");
+    expect(gestureFor("chop", { ...G, raise: { travelPx: 60, maxS: 3 } })).toBe("chop");
   });
 });
