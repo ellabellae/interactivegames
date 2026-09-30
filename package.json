@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "description": "Webcam hand-tracking tools: a 3D anatomy viewer for students and gesture games for movement practice.",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "engines": {
     "node": ">=24"
   },
