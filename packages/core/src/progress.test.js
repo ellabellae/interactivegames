@@ -1,6 +1,6 @@
 // @ts-check
 import { describe, expect, it } from "vitest";
-import { CSV_COLUMNS, MAX_SESSIONS, SESSIONS_KEY, clearSessions, createSession, csvCell, loadPlayer, loadSessions, localIso, savePlayer, saveSession, toCSV } from "./progress.js";
+import { CSV_COLUMNS, MAX_SESSIONS, SESSIONS_KEY, clearSessions, createSession, csvCell, loadPlayer, loadSessions, localIso, savePlayer, saveSession, toCSV, worthSaving } from "./progress.js";
 import { GENTLE, STANDARD } from "./settings.js";
 
 function memoryStorage(/** @type {number} */ quota = Infinity) {
@@ -66,6 +66,19 @@ describe("createSession", () => {
 
 describe("storage", () => {
   const rec = () => createSession({ game: "k", mode: "solo", detail: "", settings: STANDARD, slots: 1 }).end(true);
+  it("skips only empty, very short stopped sessions", () => {
+    const c = clock();
+    const quick = createSession({ game: "k", mode: "solo", detail: "", settings: STANDARD, slots: 1, now: c.now }); c.tick(2000);
+    expect(worthSaving(quick.end(false))).toBe(false);
+    const st = memoryStorage(); expect(saveSession(quick.record, st)).toBe(false); expect(loadSessions(st)).toEqual([]);
+    const tried = createSession({ game: "k", mode: "solo", detail: "", settings: STANDARD, slots: 1, now: c.now });
+    tried.beginStep(0, { name: "a", gesture: "stir", need: 3 }); tried.rep(0); c.tick(1000);
+    expect(worthSaving(tried.end(false))).toBe(true);          // did something
+    const long = createSession({ game: "k", mode: "solo", detail: "", settings: STANDARD, slots: 1, now: c.now }); c.tick(6000);
+    expect(worthSaving(long.end(false))).toBe(true);           // tried for a while
+    const quickDone = createSession({ game: "k", mode: "solo", detail: "", settings: STANDARD, slots: 1, now: c.now });
+    expect(worthSaving(quickDone.end(true))).toBe(true);       // finished
+  });
   it("saves, loads and clears sessions", () => {
     const st = memoryStorage();
     saveSession(rec(), st); saveSession(rec(), st);

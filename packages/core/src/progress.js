@@ -122,6 +122,16 @@ export function createSession(o) {
 }
 const round = (/** @type {number} */ x) => Math.round(x * 100) / 100;
 
+/**
+ * Worth keeping? Finished sessions always are. A stopped session is skipped
+ * only if it lasted under 5 s with nothing done (e.g. pressing Start twice),
+ * so the log isn't cluttered with empty entries.
+ * @param {Session} s
+ */
+export function worthSaving(s) {
+  return s.completed || s.seconds >= 5 || s.slots.some((sl) => sl.rows.some((r) => r.done > 0));
+}
+
 // ---------------------------------------------------------------- storage
 
 /** @typedef {Pick<Storage, "getItem" | "setItem" | "removeItem">} SessionStorageLike */
@@ -138,7 +148,7 @@ export function loadSessions(storage = defaultStorage()) {
  * @param {Session} session @param {SessionStorageLike | null} [storage]
  */
 export function saveSession(session, storage = defaultStorage()) {
-  if (!storage) return false;
+  if (!storage || !worthSaving(session)) return false;
   let all = [...loadSessions(storage), session].slice(-MAX_SESSIONS);
   for (let attempt = 0; attempt < 5; attempt++) {
     try { storage.setItem(SESSIONS_KEY, JSON.stringify(all)); return true; }
