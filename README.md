@@ -147,6 +147,59 @@ double-click `dist/games/index.html`. Things to know:
 Always run `npm run build` first. The source `.html` files in `apps/` need
 the dev server and won't work when opened directly.
 
+## Deploying to GitHub Pages
+
+The site is published automatically. Every push to `main` runs the tests,
+type check and build (`.github/workflows/pages.yml`), then publishes `dist/`
+to GitHub Pages. If any check fails, nothing is published, and the site
+keeps its last working version.
+
+**Live site:** https://ellabellae.github.io/interactivegames/
+
+**One-time setup** on github.com:
+
+1. The repository must be **public**. GitHub Pages is free only for
+   public repositories.
+2. In **Settings → Pages → Build and deployment**, set **Source** to
+   **GitHub Actions**.
+
+**To deploy a change,** merge it into `main` and push:
+
+```bash
+git switch main
+```
+
+```bash
+git merge --no-ff <your-branch>
+```
+
+```bash
+git push origin main
+```
+
+Then watch it in the repository's **Actions** tab. It takes a minute or two.
+You can also re-run a deploy by hand from the Actions tab ("Run workflow").
+
+Other branches are checked by `.github/workflows/ci.yml` (tests, type check,
+build) but never published.
+
+### Starting from scratch (a new copy of the repository)
+
+Create an **empty public** repository on github.com, without a README,
+licence or .gitignore, then:
+
+```bash
+git remote add origin https://github.com/<you>/<repo>.git
+```
+
+```bash
+git push -u origin --all
+```
+
+Then set **Settings → Pages → Source** to **GitHub Actions**. The site
+appears at `https://<you>.github.io/<repo>/`. The pages use relative links,
+so they work under any repository name.
+
 ## Tuning the settings
 
 Every threshold that makes a gesture easier or harder is in one settings
