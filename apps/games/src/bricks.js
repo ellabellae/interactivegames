@@ -8,8 +8,9 @@
 //   co-op  one board in the middle; both players' hands (or mice, or a mix)
 //          build it together. Useful for playing alongside a therapist or
 //          family member.
+//   solo   one board in the middle, one player (any hand), against your best time.
 import { createAudio, createSlots, loadSettings } from "@heart-hands/core";
-import { $, confetti, createClock, drawHands, fitCanvas, runCountdown, startCameraWithStatus } from "./common.js";
+import { $, confetti, createClock, drawHands, fitCanvas, mmss, mountProfilePicker, recordBest, remembered, runCountdown, startCameraWithStatus } from "./common.js";
 
 const settings = loadSettings();
 
@@ -29,14 +30,17 @@ const { sfx } = audio;
 function wrongDropSound() { if (settings.game.wrongDrop === "bonk") sfx.bonk(); }
 
 // ---------- game ----------
-const MODE_KEY = "heart-hands:bricks-mode";
-let mode = (() => { try { return localStorage.getItem(MODE_KEY) === "coop" ? "coop" : "race"; } catch { return "race"; } })();
+const modeStore = remembered("bricks-mode", "race", ["race", "coop", "solo"]);
+let mode = modeStore.get();
+/** One board in the middle (co-op and solo) instead of one per half (race). */
+const oneBoard = () => mode === "coop" || mode === "solo";
+const slotMode = () => (mode === "coop" ? "shared" : mode === "solo" ? "solo" : "split");
 let cell = 34, running = false;
 const clock = createClock();
-let slots = createSlots({ mode: mode === "coop" ? "shared" : "split", settings });
+let slots = createSlots({ mode: slotMode(), settings });
 const boards = [0, 1].map((b) => ({ b, board: $(`board${b + 1}`), tray: $(`tray${b + 1}`), blueprint: [], placed: 0 }));
 /** Which board a slot builds on: its own in the race, the shared one in co-op. */
-const boardOf = (slotIndex) => boards[mode === "coop" ? 0 : slotIndex];
+const boardOf = (slotIndex) => boards[oneBoard() ? 0 : slotIndex];
 /** Bricks placed by each slot this round (shown at the end of co-op). */
 const placedBy = [0, 0];
 /** Brick currently held by each slot: { el, ph, offX, offY, board } or null. */
@@ -50,7 +54,7 @@ function brickEl(b) {
 }
 function setup() {
   const bricks = SETS[$("setSel").value], [minCell, maxCell] = settings.targets.brickCellPx;
-  const width = mode === "coop" ? innerWidth : innerWidth / 2;
+  const width = oneBoard() ? innerWidth : innerWidth / 2;
   cell = Math.max(minCell, Math.min(maxCell, Math.floor((width - 40) / COLS)));
   document.documentElement.style.setProperty("--cell", cell + "px");
   grabs.fill(null); placedBy.fill(0);
@@ -70,9 +74,11 @@ function setup() {
 }
 function applyMode() {
   document.body.classList.toggle("coop", mode === "coop");
+  document.body.classList.toggle("solo", mode === "solo");
   $("modeSel").value = mode;
-  document.querySelector(".zone.p1 .who").childNodes[1].textContent = mode === "coop" ? "Together " : "Player 1 ";
-  $("countHint").textContent = mode === "coop" ? "Get your hands up. One board, build it together." : "Get your hands up, one player on each side.";
+  document.querySelector(".zone.p1 .who").childNodes[1].textContent = mode === "coop" ? "Together " : mode === "solo" ? "You " : "Player 1 ";
+  $("countHint").textContent = mode === "coop" ? "Get your hands up. One board, build it together."
+    : mode === "solo" ? "Get ready. Use either hand, and take your time." : "Get your hands up, one player on each side.";
 }
 function updateScores() { boards.forEach((bd) => ($(`s${bd.b + 1}`).textContent = `${bd.placed} / ${bd.blueprint.length}`)); }
 
@@ -147,6 +153,13 @@ function finish(winner) {
     $("winText").textContent = `${$("setSel").value} built in ${clock.text}. Player 1 placed ${placedBy[0]}, Player 2 placed ${placedBy[1]}.`;
     releaseAll(); setTimeout(() => $("winner").classList.add("on"), 900); return;
   }
+  if (mode === "solo") {
+    const set = $("setSel").value, variant = $("hard").checked ? "hidden" : "colors";
+    const r = recordBest(`bricks:${set}:${variant}:${settings.id}`, clock.seconds);
+    $("winTitle").textContent = r.isNew && r.previous !== null ? "New personal best!" : "Built!";
+    $("winText").textContent = `${set} built in ${clock.text}. ` + (r.previous === null ? "That's your first time on this one." : r.isNew ? `Your previous best was ${mmss(r.previous)}.` : `Your best is ${mmss(r.best)}.`);
+    releaseAll(); setTimeout(() => $("winner").classList.add("on"), 900); return;
+  }
   const other = boards[1 - winner.b];
   $("winTitle").textContent = `Player ${winner.b + 1} wins!`;
   $("winText").textContent = `${$("setSel").value} built in ${clock.text}. Player ${other.b + 1} had ${other.placed} of ${other.blueprint.length} bricks placed.`;
@@ -172,11 +185,13 @@ Object.keys(SETS).forEach((k) => { const o = document.createElement("option"); o
 $("setSel").addEventListener("change", () => { if (!running) setup(); });
 $("start").addEventListener("click", startRace);
 $("again").addEventListener("click", () => { $("winner").classList.remove("on"); const s = $("setSel"); s.selectedIndex = (s.selectedIndex + 1) % s.options.length; startRace(); });
+mountProfilePicker(/** @type {HTMLSelectElement} */ ($("profileSel")));
 $("modeSel").addEventListener("change", () => {
-  mode = $("modeSel").value === "coop" ? "coop" : "race";
-  try { localStorage.setItem(MODE_KEY, mode); } catch { /* storage blocked: mode just isn't remembered */ }
+  const v = $("modeSel").value;
+  mode = v === "coop" || v === "solo" ? v : "race";
+  modeStore.set(mode);
   releaseAll(); running = false; clock.stop(); clock.clear();
-  slots = createSlots({ mode: mode === "coop" ? "shared" : "split", settings });
+  slots = createSlots({ mode: slotMode(), settings });
   applyMode(); setup();
 });
 $("hard").addEventListener("change", () => boards.forEach((bd) => bd.blueprint.forEach((b) => b.ghost.classList.toggle("hidecolor", $("hard").checked))));

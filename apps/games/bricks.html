@@ -59,8 +59,8 @@
   #status.hidden { display: none; }
   a.pill { color: inherit; text-decoration: none; }
   /* co-op: one board in the middle for both players */
-  body.coop .divider, body.coop .zone.p2 { display: none; }
-  body.coop .zone.p1 { width: 100%; }
+  body.coop .divider, body.coop .zone.p2, body.solo .divider, body.solo .zone.p2 { display: none; }
+  body.coop .zone.p1, body.solo .zone.p1 { width: 100%; }
   body.coop .p1 .who i { background: linear-gradient(90deg, var(--p1) 50%, var(--p2) 50%); }
   body.coop .p1 .board { box-shadow: 0 0 0 4px var(--p1), 0 0 0 8px var(--p2); }
 </style>
@@ -72,7 +72,7 @@
 
 <div class="top">
   <a class="pill" href="./index.html" aria-label="Back to games">← Games</a>
-  <div class="pill"><select id="modeSel" aria-label="Game mode"><option value="race">Race: 2 boards</option><option value="coop">Co-op: 1 board</option></select><select id="setSel" aria-label="Choose what to build"></select><label><input type="checkbox" id="hard"> Hide colors</label></div>
+  <div class="pill"><select id="modeSel" aria-label="Game mode"><option value="race">Race: 2 boards</option><option value="coop">Co-op: 1 board</option><option value="solo">Solo</option></select><select id="setSel" aria-label="Choose what to build"></select><label><input type="checkbox" id="hard"> Hide colors</label><select id="profileSel" aria-label="Profile"></select></div>
   <div class="pill" id="clock">0:00</div>
   <button class="go" id="start">Start race</button>
 </div>
