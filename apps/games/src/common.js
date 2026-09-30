@@ -2,7 +2,7 @@
 // Pieces both games share that are specific to the games' look: hand and
 // cursor drawing, countdown, clock, confetti and camera status. Lifted from
 // legacy/kitchen-race.html and brick-race.html, where they were identical.
-import { HAND_CONNECTIONS, createTracker, isCameraBlocked, startCamera } from "@heart-hands/core";
+import { HAND_CONNECTIONS, PROFILES, createTracker, isCameraBlocked, loadChoice, saveChoice, startCamera } from "@heart-hands/core";
 
 export const $ = (/** @type {string} */ id) => /** @type {HTMLElement} */ (document.getElementById(id));
 export const PLAYER_COLORS = ["#ff8a00", "#2f80ed"];
@@ -93,3 +93,44 @@ export async function startCameraWithStatus(video) {
     return null;
   }
 }
+
+// ---------- profile picker and personal bests ----------
+
+/**
+ * Fill a <select> with the profiles and keep the choice in storage.
+ * Changing profile reloads the page so every threshold is re-read cleanly.
+ * @param {HTMLSelectElement} select
+ */
+export function mountProfilePicker(select) {
+  const choice = loadChoice();
+  select.innerHTML = Object.values(PROFILES).map((p) => `<option value="${p.id}">${p.label}</option>`).join("");
+  select.value = choice.profileId;
+  select.addEventListener("change", () => { saveChoice({ ...choice, profileId: select.value }); location.reload(); });
+}
+
+/**
+ * A remembered per-game setting (e.g. mode). Storage failures just mean it isn't remembered.
+ * @param {string} key @param {string} fallback @param {string[]} [allowed]
+ */
+export function remembered(key, fallback, allowed) {
+  const k = `heart-hands:${key}`;
+  let v = fallback;
+  try { const got = localStorage.getItem(k); if (got && (!allowed || allowed.includes(got))) v = got; } catch { /* use fallback */ }
+  return { get: () => v, set(/** @type {string} */ next) { v = next; try { localStorage.setItem(k, next); } catch { /* not remembered */ } } };
+}
+
+/**
+ * Record a solo time and say how it compares with the best on this device.
+ * @param {string} key  e.g. "kitchen:Pancakes:gentle"
+ * @param {number} seconds
+ * @returns {{ best: number, isNew: boolean, previous: number | null }}
+ */
+export function recordBest(key, seconds) {
+  const k = `heart-hands:best:${key}`;
+  let previous = null;
+  try { const v = parseFloat(localStorage.getItem(k) ?? ""); if (Number.isFinite(v)) previous = v; } catch { /* no history */ }
+  const isNew = previous === null || seconds < previous;
+  if (isNew) try { localStorage.setItem(k, String(seconds)); } catch { /* not remembered */ }
+  return { best: isNew ? seconds : /** @type {number} */ (previous), isNew, previous };
+}
+export const mmss = (/** @type {number} */ s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;

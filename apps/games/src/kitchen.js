@@ -2,8 +2,8 @@
 // mini-game. Ported from legacy/kitchen-race.html onto @heart-hands/core:
 // thresholds come from the settings profile, gestures from the shared
 // detectors, input from player slots (hand or mouse/touch).
-import { createAudio, createDetector, createLoop, createSlots, isNear, loadSettings } from "@heart-hands/core";
-import { $, confetti, createClock, drawHands, fitCanvas, runCountdown, startCameraWithStatus } from "./common.js";
+import { createAudio, createDetector, createLoop, createSlots, gestureFor, isNear, loadSettings } from "@heart-hands/core";
+import { $, confetti, createClock, drawHands, fitCanvas, mmss, mountProfilePicker, recordBest, remembered, runCountdown, startCameraWithStatus } from "./common.js";
 
 const settings = loadSettings();
 
@@ -27,7 +27,7 @@ const RECIPES = {
     { name: "Crack eggs", kind: "pinchdrop", need: 3, from: "🥚", into: "🥣", hint: "Pinch an egg and let go over the bowl", sfx: sfx.crack },
     { name: "Stir batter", kind: "stir", need: 4, at: "🥣", hint: "Make big circles over the bowl", sfx: sfx.swish },
     { name: "Pour", kind: "drag", need: 1, from: "🥣", into: "🍳", hint: "Pinch the bowl and carry it to the pan", sfx: sfx.sizzle },
-    { name: "Flip", kind: "flick", need: 3, at: "🍳", hint: "Flick your hand straight up, fast", sfx: sfx.sizzle },
+    { name: "Flip", kind: "flick", need: 3, at: "🍳", hint: "Flick your hand straight up, fast", raiseHint: "Lift your hand slowly up from the pan", sfx: sfx.sizzle },
     { name: "Plate up", kind: "drag", need: 1, from: "🥞", into: "🍽️", hint: "Pinch the pancakes and carry them to the plate", sfx: sfx.dingdong },
   ],
   "Stir-fry": [
@@ -42,17 +42,22 @@ const RECIPES = {
     { name: "Chop banana", kind: "chop", need: 10, at: "🍌", hint: "Chop! Up and down over the banana", sfx: sfx.chop },
     { name: "Add banana", kind: "drag", need: 1, from: "🍌", into: "🍧", hint: "Pinch the banana and carry it to the cup", sfx: sfx.swish },
     { name: "Sprinkles", kind: "shake", need: 10, from: "🧁", at: "🍧", hint: "Pinch the sprinkles and wiggle side to side", sfx: sfx.shake },
-    { name: "Cherry on top", kind: "flick", need: 2, at: "🍒", hint: "Flick your hand up to toss the cherry", sfx: sfx.dingdong },
+    { name: "Cherry on top", kind: "flick", need: 2, at: "🍒", hint: "Flick your hand up to toss the cherry", raiseHint: "Lift your hand slowly up from the cherry", sfx: sfx.dingdong },
   ],
 };
 /** Repetitions for a step under the current profile (never below 1). */
 const needFor = (step) => Math.max(1, Math.round(step.need * settings.game.repsScale));
-const DETECTED = new Set(["stir", "chop", "flick", "shake"]);
+const DETECTED = new Set(["stir", "chop", "flick", "raise", "shake"]);
+/** The gesture a step uses under this profile (gentle: flick becomes a slow raise). */
+const kindOf = (step) => gestureFor(step.kind, settings.gestures);
 
 // =============== game state ===============
 let running = false;
 const clock = createClock();
-const slots = createSlots({ mode: "split", settings });
+// Race: two cooks, one per half. Solo: one station in the middle, any hand, against your best time.
+const mode = remembered("kitchen-mode", "race", ["race", "solo"]);
+const solo = () => mode.get() === "solo";
+let slots = createSlots({ mode: solo() ? "solo" : "split", settings });
 const players = [0, 1].map((p) => ({
   p, station: $(`station${p + 1}`), stepsEl: $(`steps${p + 1}`), recipe: [], si: 0, count: 0,
   held: null, src: null, dst: null, detector: null,
@@ -61,14 +66,15 @@ const players = [0, 1].map((p) => ({
 function layoutStation(pl) {
   const st = pl.station, step = pl.recipe[pl.si];
   st.innerHTML = `<div class="counter"></div><div class="meter"><div></div></div>`;
-  pl.detector = step && DETECTED.has(step.kind) ? createDetector(step.kind, settings.gestures) : null;
+  pl.detector = step && DETECTED.has(kindOf(step)) ? createDetector(kindOf(step), settings.gestures) : null;
   if (!step) return;
   const put = (emoji, x, y, cls = "") => { const d = document.createElement("div"); d.className = "item " + cls; d.textContent = emoji; d.style.left = x + "%"; d.style.top = y + "%"; st.appendChild(d); return d; };
   if (step.kind === "pinchdrop" || step.kind === "drag") { pl.src = put(step.from, 24, 52, "small zone-ring"); pl.dst = put(step.into, 72, 52, "zone-ring hot"); }
   else if (step.kind === "shake") { pl.src = put(step.from, 24, 52, "small zone-ring"); pl.dst = put(step.at, 72, 52, ""); }
   else { pl.src = null; pl.dst = put(step.at, 50, 52, "zone-ring hot"); }
   const need = needFor(step);
-  const h = document.createElement("div"); h.className = "hint"; h.innerHTML = `${step.hint}<span>${need > 1 ? `${need} times` : ""}</span>`; st.appendChild(h);
+  const hint = kindOf(step) === "raise" && step.raiseHint ? step.raiseHint : step.hint;
+  const h = document.createElement("div"); h.className = "hint"; h.innerHTML = `${hint}<span>${need > 1 ? `${need} times` : ""}</span>`; st.appendChild(h);
   pl.stepsEl.innerHTML = pl.recipe.map((s, i) => `<div class="step ${i < pl.si ? "done" : i === pl.si ? "now" : ""}">${i < pl.si ? "✓ " : ""}${s.name}</div>`).join("");
 }
 function setup() {
@@ -101,7 +107,7 @@ function updateGesture(pl, inp, dt) {
   const pt = inp.x != null ? { x: inp.x, y: inp.y } : null;
   if (pl.held && pt) { pl.held.style.left = pt.x + "px"; pl.held.style.top = pt.y + "px"; }
 
-  switch (step.kind) {
+  switch (kindOf(step)) {
     case "pinchdrop":
       if (inp.pressed && near(pt, pl.src)) hold(pl, step.from);
       if (inp.released && pl.held) { if (near(pt, pl.dst)) { puff(pl, step.from, pt); progress(pl); } dropHeld(pl); }
@@ -118,6 +124,7 @@ function updateGesture(pl, inp, dt) {
       if (pl.detector.update(pt, targetOf(pl.dst), dt)) { progress(pl); puff(pl, "🔪", pt); }
       break;
     case "flick":
+    case "raise":
       if (pl.detector.update(pt, targetOf(pl.dst), dt)) { progress(pl); puff(pl, step.at === "🍒" ? "🍒" : "🥞", pt); }
       break;
     case "shake":
@@ -142,7 +149,7 @@ function frame(now) {
   const hands = tracker?.read();
   if (hands) slots.updateHands(hands);
   const inputs = slots.frame();
-  players.forEach((pl) => updateGesture(pl, inputs[pl.p], dt));
+  activePlayers().forEach((pl) => updateGesture(pl, inputs[pl.p], dt));
   drawHands(hctx, slots);
   requestAnimationFrame(frame);
 }
@@ -154,13 +161,36 @@ function startRace() {
 }
 function finish(winner) {
   running = false; clock.stop(); music.stop(); sfx.fanfare(); confetti(["#ff8a00", "#2f80ed", "#ffcf3f", "#2ecc71", "#ff6fa8", "#fff"]);
+  if (solo()) {
+    const dish = $("recipeSel").value, r = recordBest(`kitchen:${dish}:${settings.id}`, clock.seconds);
+    $("winTitle").textContent = r.isNew && r.previous !== null ? "New personal best!" : "Done!";
+    $("winText").textContent = `${dish} cooked in ${clock.text}. ` + (r.previous === null ? "That's your first time on this dish." : r.isNew ? `Your previous best was ${mmss(r.previous)}.` : `Your best is ${mmss(r.best)}.`);
+    setTimeout(() => $("winner").classList.add("on"), 900); return;
+  }
   const other = players[1 - winner.p];
   $("winTitle").textContent = `Player ${winner.p + 1} serves first!`;
   $("winText").textContent = `${$("recipeSel").value} done in ${clock.text}. Player ${other.p + 1} was on step ${Math.min(other.si + 1, other.recipe.length)} of ${other.recipe.length}: ${other.recipe[Math.min(other.si, other.recipe.length - 1)].name}.`;
   setTimeout(() => $("winner").classList.add("on"), 900);
 }
 
+/** The players taking part: both in the race, only the first in solo. */
+const activePlayers = () => (solo() ? [players[0]] : players);
+function applyMode() {
+  document.body.classList.toggle("solo", solo());
+  $("modeSel").value = mode.get();
+  document.querySelector(".zone.p1 .who").childNodes[1].textContent = solo() ? "You" : "Player 1";
+  $("countHint").textContent = solo() ? "Get ready. Use either hand, and take your time." : "Aprons on. One cook on each side of the screen.";
+}
+
 // =============== wiring ===============
+mountProfilePicker(/** @type {HTMLSelectElement} */ ($("profileSel")));
+$("modeSel").addEventListener("change", () => {
+  mode.set($("modeSel").value === "solo" ? "solo" : "race");
+  running = false; clock.stop(); music.stop();
+  slots = createSlots({ mode: solo() ? "solo" : "split", settings });
+  applyMode(); setup();
+});
+applyMode();
 Object.keys(RECIPES).forEach((k) => { const o = document.createElement("option"); o.textContent = k; $("recipeSel").appendChild(o); });
 $("recipeSel").addEventListener("change", () => { if (!running) setup(); });
 $("start").addEventListener("click", startRace);

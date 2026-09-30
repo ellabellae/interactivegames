@@ -53,6 +53,9 @@
   #status { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 20; background: var(--panel); border-radius: 999px; padding: 6px 14px; font-size: 14px; }
   #status.hidden { display: none; }
   a.pill { color: inherit; text-decoration: none; }
+  /* solo: one station in the middle, any hand */
+  body.solo .divider, body.solo .zone.p2 { display: none; }
+  body.solo .zone.p1 { width: 100%; }
 </style>
 </head>
 <body>
@@ -62,7 +65,7 @@
 
 <div class="top">
   <a class="pill" href="./index.html" aria-label="Back to games">← Games</a>
-  <div class="pill"><select id="recipeSel" aria-label="Choose a dish"></select></div>
+  <div class="pill"><select id="modeSel" aria-label="Game mode"><option value="race">Race</option><option value="solo">Solo</option></select><select id="recipeSel" aria-label="Choose a dish"></select><select id="profileSel" aria-label="Profile"></select></div>
   <div class="pill" id="clock">0:00</div>
   <button id="music" aria-pressed="true">Music on</button>
   <button class="go" id="start">Start cooking</button>
