@@ -16,14 +16,17 @@ import { HAND_CONNECTIONS, createSlots, createTracker, isCameraBlocked, loadSett
 const settings = loadSettings();
 const V = settings.viewer;
 const MODEL_SIZE = 2.3;        // models are normalised to this many world units across
-let bpm = 70, beatOn = true;
+let bpm = 70, beatOn = false;   // whole-model pulse; off by default so the model holds still for study (B toggles)
 const BEAT_AMOUNT = 0.025;
 
 // ---------- DOM ----------
 const $ = (id) => document.getElementById(id);
 const video = $("video"), handCanvas = $("hands"), handCtx = handCanvas.getContext("2d");
 const statusEl = $("status"), partsEl = $("parts"), subtitleEl = $("subtitle");
-const setStatus = (msg) => { statusEl.textContent = msg; statusEl.classList.toggle("hidden", !msg); };
+let statusTimer = null;
+const setStatus = (msg) => { clearTimeout(statusTimer); statusEl.textContent = msg; statusEl.classList.toggle("hidden", !msg); };
+/** A message that clears itself, so it doesn't sit over the heart. */
+const flashStatus = (msg, ms = 6000) => { setStatus(msg); statusTimer = setTimeout(() => setStatus(""), ms); };
 
 // ---------- three.js ----------
 const renderer = new THREE.WebGLRenderer({ canvas: $("scene"), alpha: true, antialias: true });
@@ -71,7 +74,7 @@ const LOOKS = {
   },
 };
 const LOOK_KEY = "heart-hands:viewer-look";
-let look = LOOKS[(() => { try { return localStorage.getItem(LOOK_KEY); } catch { return null; } })()] ?? LOOKS.hologram;
+let look = LOOKS[(() => { try { return localStorage.getItem(LOOK_KEY); } catch { return null; } })()] ?? LOOKS.flat;   // flat by default: opaque parts don't flicker when they overlap
 
 function colorFor(name, i) {
   const n = name.toLowerCase();
@@ -307,7 +310,16 @@ addEventListener("keydown", (e) => {
 
 // mouse click on a part isolates it
 const raycaster = new THREE.Raycaster();
+// A drag (to rotate) ends with a click event too; only a press that barely
+// moved counts as clicking a part. Before this, every rotation hid all parts
+// except whichever one the pointer ended on.
+const CLICK_SLOP_PX = 5;
+let pressAt = null;
+renderer.domElement.addEventListener("pointerdown", (e) => { pressAt = { x: e.clientX, y: e.clientY }; });
 renderer.domElement.addEventListener("click", (e) => {
+  const moved = pressAt ? Math.hypot(e.clientX - pressAt.x, e.clientY - pressAt.y) : 0;
+  pressAt = null;
+  if (moved > CLICK_SLOP_PX) return;
   const ndc = new THREE.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
   const hit = pickPart(ndc);
   if (hit >= 0) isolate(hit);
@@ -358,6 +370,7 @@ function drawHands() {
 // ---------- gestures ----------
 const state = { rotX: 0, rotY: 0, targetRotX: 0, targetRotY: 0, scale: 1, targetScale: 1 };
 const grab = { part: -1, depth: 0, prev: null, emissive: [] };
+let rotPrev = null;   // palm position last frame, for relative hand rotation
 const tmpQ = new THREE.Quaternion();
 
 function setGrabHighlight(p, on) {
@@ -413,10 +426,16 @@ function applyGestures(dt, inputs) {
       const m = V.twoHandScale;
       state.targetScale = THREE.MathUtils.clamp(THREE.MathUtils.mapLinear(d, m.from[0], m.from[1], m.to[0], m.to[1]), m.clamp[0], m.clamp[1]);
     }
-    if (grab.part < 0) {
-      state.targetRotY = (cx - 0.5) * Math.PI * V.rotateGain.y;
-      state.targetRotX = (cy - 0.5) * Math.PI * V.rotateGain.x;
+    // Rotation follows how far the hand moves, not where it is, so the heart
+    // doesn't jump when a hand comes into view and stays put when it leaves.
+    // Same gain as before: moving across the whole frame turns it the same amount.
+    if (grab.part < 0 && rotPrev) {
+      state.targetRotY += (cx - rotPrev.x) * Math.PI * V.rotateGain.y;
+      state.targetRotX += (cy - rotPrev.y) * Math.PI * V.rotateGain.x;
     }
+    rotPrev = grab.part < 0 ? { x: cx, y: cy } : null;
+  } else {
+    rotPrev = null;
   }
   state.rotX += (state.targetRotX - state.rotX) * Math.min(1, dt * V.rotateEase);
   state.rotY += (state.targetRotY - state.rotY) * Math.min(1, dt * V.rotateEase);
@@ -454,7 +473,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   const t = now / 1000;
-  const hands = tracker?.read();
+  const hands = handsOn ? tracker?.read() : null;
   if (hands) slots.updateHands(hands);
   const inputs = slots.frame();
   if (model) applyGestures(dt, inputs);
@@ -531,18 +550,42 @@ $("credit").textContent = CREDIT;
 loadBuiltIn();
 requestAnimationFrame(frame);
 
-(async () => {
+// ---------- hand control (opt-in) ----------
+// Off by default: the mouse is the main way to study the model, and the
+// camera isn't requested until the student turns hand control on.
+const HANDS_KEY = "heart-hands:viewer-hands";
+let handsOn = false;
+function showHandsState() {
+  $("handsBtn").textContent = `Hand control: ${handsOn ? "on" : "off"}`;
+  $("handsBtn").setAttribute("aria-pressed", String(handsOn));
+  document.body.classList.toggle("hands-off", !handsOn);
+}
+function saveHands() { try { localStorage.setItem(HANDS_KEY, handsOn ? "on" : "off"); } catch { /* not remembered */ } }
+async function enableHands() {
+  handsOn = true; showHandsState();
   try {
+    setStatus("Starting camera…");
     await startCamera(video);
     setStatus("Loading hand tracking…");
-    tracker = await createTracker(video);
-    setStatus("");
+    tracker = tracker ?? await createTracker(video);
+    setStatus(""); saveHands();
   } catch (err) {
     console.error(err);
+    disableHands();
     if (isCameraBlocked(err)) {
-      setStatus("Camera blocked. Allow camera access for this page in the address bar, then reload. Mouse controls still work.");
+      flashStatus("Camera blocked. Allow camera access for this page in the address bar, then turn hand control on again. Mouse controls still work.");
     } else {
-      setStatus("Couldn't load hand tracking. Check your internet connection and reload. Mouse controls still work.");
+      flashStatus("Couldn't load hand tracking. Check your internet connection and try again. Mouse controls still work.");
     }
   }
-})();
+}
+function disableHands() {
+  handsOn = false; showHandsState();
+  const stream = video.srcObject;
+  if (stream) { stream.getTracks().forEach((t) => t.stop()); video.srcObject = null; }
+  slots.reset(); saveHands();
+}
+$("handsBtn").addEventListener("click", () => { if (handsOn) disableHands(); else enableHands(); });
+setStatus("");
+showHandsState();
+if ((() => { try { return localStorage.getItem(HANDS_KEY) === "on"; } catch { return false; } })()) enableHands();
