@@ -1,0 +1,11 @@
+{
+  "name": "@heart-hands/physiology",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite"
+  },
+  "dependencies": {
+    "@heart-hands/core": "*"
+  }
+}

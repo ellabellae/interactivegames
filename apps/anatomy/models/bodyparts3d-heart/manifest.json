@@ -173,9 +173,15 @@
       "trimmed": false,
       "triangles": 3018
     },
-    "Coronary sinus and cardiac veins": {
+    "Coronary sinus": {
       "elements": [
-        "FJ2655",
+        "FJ2655"
+      ],
+      "trimmed": false,
+      "triangles": 624
+    },
+    "Cardiac veins": {
+      "elements": [
         "FJ2656",
         "FJ2724",
         "FJ2731",
@@ -184,7 +190,7 @@
         "FJ2729"
       ],
       "trimmed": false,
-      "triangles": 4386
+      "triangles": 3762
     },
     "Ascending aorta": {
       "elements": [

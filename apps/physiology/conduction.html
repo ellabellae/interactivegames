@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Excitation and conduction</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  /* Colours and type from the heart viewer's flat look (legacy/heart-anatomy.html). */
+  html, body { margin: 0; height: 100%; background: #14080a; overflow: hidden; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", sans-serif; color: #f6e9e6; font-size: 13px; }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; }
+  .ui { position: fixed; z-index: 10; }
+  #title { top: 22px; left: 26px; font-family: "Instrument Serif", Georgia, serif; font-size: 28px; pointer-events: none; }
+  #title em { font-style: italic; color: #f4a3a3; }
+  #subtitle { top: 56px; left: 27px; opacity: 0.6; pointer-events: none; }
+  #subtitle a { color: inherit; pointer-events: auto; }
+
+  #panel { top: 22px; right: 22px; width: 300px; max-height: calc(100vh - 170px); overflow: auto; background: rgba(20, 8, 10, 0.78); border-radius: 8px; padding: 12px 14px; backdrop-filter: blur(6px); }
+  #panel h2 { font-family: "Instrument Serif", Georgia, serif; font-weight: 400; font-size: 18px; margin: 0 0 8px; }
+  #stages { list-style: none; margin: 0 0 10px; padding: 0; counter-reset: st; }
+  #stages li { counter-increment: st; padding: 6px 8px; border-radius: 5px; cursor: pointer; opacity: 0.6; }
+  #stages li::before { content: counter(st) ". "; opacity: 0.7; }
+  #stages li.now { opacity: 1; background: rgba(255,255,255,0.08); }
+  #stages li.now .text { display: block; }
+  #stages .text { display: none; margin-top: 4px; line-height: 1.45; opacity: 0.85; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+  button, select { font: inherit; color: inherit; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18); border-radius: 5px; padding: 5px 9px; cursor: pointer; }
+  select option { color: #111; }
+  button:hover { background: rgba(255,255,255,0.18); }
+  button:focus-visible, select:focus-visible { outline: 2px solid #f4a3a3; outline-offset: 1px; }
+  label { display: flex; gap: 5px; align-items: center; cursor: pointer; }
+
+  #timeline { left: 26px; right: 342px; bottom: 22px; background: rgba(20, 8, 10, 0.78); border-radius: 8px; padding: 10px 14px 12px; }
+  #clock { font-family: "Instrument Serif", Georgia, serif; font-size: 22px; }
+  #clock small { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; opacity: 0.6; margin-left: 6px; }
+  #bar { position: relative; height: 26px; margin-top: 6px; border-radius: 4px; overflow: hidden; cursor: pointer; background: rgba(255,255,255,0.06); touch-action: none; }
+  #bar .seg { position: absolute; top: 0; bottom: 0; font-size: 11px; padding: 6px 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; border-right: 1px solid rgba(0,0,0,0.35); }
+  #bar .head { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #fff; box-shadow: 0 0 6px #fff; }
+  #ticks { position: relative; height: 14px; font-size: 10px; opacity: 0.55; }
+  #ticks span { position: absolute; transform: translateX(-50%); }
+
+  #key { top: 90px; left: 26px; line-height: 1.8; pointer-events: none; }
+  #key i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+
+  .label { position: fixed; z-index: 9; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap;
+    padding: 3px 8px; border-radius: 4px; background: rgba(20, 8, 10, 0.78); font-size: 12px; margin-top: -8px; }
+  .label::after { content: ""; position: absolute; left: 50%; bottom: -5px; width: 1px; height: 5px; background: rgba(255,255,255,0.5); }
+  #status { top: 50%; left: 50%; transform: translate(-50%, -50%); font-family: "Instrument Serif", Georgia, serif; font-size: 22px; text-align: center;
+    background: rgba(20, 8, 10, 0.72); padding: 14px 22px; border-radius: 6px; max-width: 28em; pointer-events: none; }
+  #status.hidden { display: none; }
+  #credit { opacity: 0.5; margin-top: 10px; font-size: 11px; line-height: 1.4; }
+  @media (max-width: 760px) { #panel { width: auto; left: 12px; right: 12px; top: auto; bottom: 110px; max-height: 38vh; } #timeline { right: 12px; left: 12px; bottom: 12px; } #key { display: none; } }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div class="ui" id="title">Excitation <em>and conduction</em></div>
+<div class="ui" id="subtitle">One heartbeat, step by step · <a href="./index.html">All lessons</a></div>
+<div class="ui" id="key">
+  <div><i style="background:#d8c3bd"></i>Resting muscle</div>
+  <div><i style="background:#ffe14a"></i>Conduction system (lit when the impulse passes)</div>
+  <div><i style="background:#b44cff"></i>Depolarised muscle</div>
+</div>
+
+<div class="ui" id="panel">
+  <h2>One heartbeat</h2>
+  <ol id="stages"></ol>
+  <div class="row">
+    <button id="prev" aria-label="Previous stage">◀ Stage</button>
+    <button id="play">Play</button>
+    <button id="next" aria-label="Next stage">Stage ▶</button>
+  </div>
+  <div class="row">
+    <label>Speed <select id="speed">
+      <option value="0.1">1/10 (slow motion)</option>
+      <option value="0.25" selected>1/4</option>
+      <option value="1">Real time</option>
+    </select></label>
+    <label><input type="checkbox" id="loop" checked> Loop</label>
+  </div>
+  <div class="row">
+    <label><input type="checkbox" id="labels" checked> Labels</label>
+    <label><input type="checkbox" id="walls" checked> See-through walls</label>
+    <label><input type="checkbox" id="vessels" checked> Valves and vessels</label>
+  </div>
+  <div id="credit">Heart: BodyParts3D, © DBCLS, CC BY-SA 2.1 JP (modified). Timings from the course lecture; a simplified teaching model, not a clinical simulation. Conduction-system positions are approximate.</div>
+</div>
+
+<div class="ui" id="timeline">
+  <div id="clock">0 ms <small>after the SA node fires</small></div>
+  <div id="bar" role="slider" aria-label="Time in the heartbeat" tabindex="0"></div>
+  <div id="ticks"></div>
+</div>
+<div class="ui" id="status">Loading heart…</div>
+<script type="module" src="./src/lesson-conduction.js"></script>
+</body>
+</html>
