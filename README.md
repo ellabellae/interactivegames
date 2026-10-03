@@ -6,7 +6,7 @@ I am building webcam hand-tracking tools that run in a web browser to explore ho
   that you can turn, take apart and label, with your hands through the
   webcam or with the mouse, and a lesson that follows one
   heartbeat through the heart's conduction system. All the anatomy is built from BodyParts3D, a free 3D anatomy database made by Database Center for Life Science in Japan. 
-  - **Hand games**: gesture games for one or two people on one webcam. They
+- **Hand games**: gesture games for one or two people on one webcam. They
   give people with Parkinson's a playful way to practise hand movements
   such as pinching, lifting, stirring and chopping.
 
