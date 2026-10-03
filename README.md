@@ -4,7 +4,8 @@ Webcam hand-tracking tools that run in a web browser. There are two parts,
 built on one shared codebase:
 
 - **Heart anatomy and physiology**: a 3D heart built from real anatomy data
-  that you can turn, take apart and label, and a lesson that follows one
+  that you can turn, take apart and label, with your hands through the
+  webcam or with the mouse, and a lesson that follows one
   heartbeat through the heart's conduction system. For students learning
   anatomy and physiology.
 - **Hand games**: gesture games for one or two people on one webcam. They
@@ -13,9 +14,22 @@ built on one shared codebase:
 
 ### [Try it in your browser →](https://ellabellae.github.io/interactivegames/)
 
-A working site, not a video. No install needed. Open the heart, drag to turn
-it, press E to take it apart, then open the physiology lesson and step
-through a heartbeat.
+A working site, not a video. No install needed. Everything is in **3D**: turn
+the heart, zoom in, take it apart and look inside.
+
+**Use your webcam and your hands, or the mouse.**
+
+| | **Your hands, through the webcam** | **Mouse or trackpad** |
+|---|---|---|
+| Turn it in 3D | open hand and move it | drag |
+| Grab a part and pull it out | pinch it, move, let go | press E to take everything apart |
+| Zoom | move two hands apart or together | scroll |
+| Pick out one part | — | click it, or its name in the list |
+
+In the heart viewer, click **✋ Use webcam** and allow the camera.
+Hand tracking runs inside your browser, and the video never leaves your
+computer. The games use the webcam too: two people can play side by side on
+one camera. The demo below was recorded with the mouse.
 
 ![The realistic heart turning, exploding into its parts, the tricuspid valve on its own, then one heartbeat: the SA node fires, the atria depolarise, the AV node holds the impulse, the bundle branches and Purkinje fibres light up, and the ventricles depolarise](docs/img/demo.gif)
 
@@ -52,7 +66,8 @@ time and adjusting the game settings, not a measure of health.
   Use the "Load model" button or drop the files on the page.
 - Two looks: hologram and flat.
 - Controls:
-  - **Hands** (turn on "Hand control" first; it's off by default): open
+  - **Hands, through the webcam** (click "✋ Use webcam" first; it's
+    off by default): open
     hand to rotate; pinch a part to grab and move it; two hands apart to
     zoom.
   - **Mouse:** drag to rotate, scroll to zoom, click a part (or its name in
