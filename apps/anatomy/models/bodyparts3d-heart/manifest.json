@@ -1,0 +1,328 @@
+{
+  "source": "BodyParts3D 4.0, partof_BP3D_4.0_obj_99.zip",
+  "marginMm": 25,
+  "pulmonaryMarginMm": 12,
+  "parts": {
+    "Right atrium": {
+      "elements": [
+        "FJ2439"
+      ],
+      "trimmed": false,
+      "triangles": 17784
+    },
+    "Left atrium": {
+      "elements": [
+        "FJ2438"
+      ],
+      "trimmed": false,
+      "triangles": 7544
+    },
+    "Right ventricle": {
+      "elements": [
+        "FJ2423"
+      ],
+      "trimmed": false,
+      "triangles": 1918
+    },
+    "Left ventricle": {
+      "elements": [
+        "FJ2422"
+      ],
+      "trimmed": false,
+      "triangles": 1722
+    },
+    "Tricuspid valve": {
+      "elements": [
+        "FJ2421",
+        "FJ2433",
+        "FJ2436"
+      ],
+      "trimmed": false,
+      "triangles": 17612
+    },
+    "Mitral valve": {
+      "elements": [
+        "FJ2420",
+        "FJ2432"
+      ],
+      "trimmed": false,
+      "triangles": 11378
+    },
+    "Pulmonary valve": {
+      "elements": [
+        "FJ2417",
+        "FJ2427",
+        "FJ2434"
+      ],
+      "trimmed": false,
+      "triangles": 3638
+    },
+    "Aortic valve": {
+      "elements": [
+        "FJ2426",
+        "FJ2431",
+        "FJ2435"
+      ],
+      "trimmed": false,
+      "triangles": 2150
+    },
+    "Right ventricle papillary muscles": {
+      "elements": [
+        "FJ2419",
+        "FJ2430",
+        "FJ2437"
+      ],
+      "trimmed": false,
+      "triangles": 2418
+    },
+    "Left ventricle papillary muscles": {
+      "elements": [
+        "FJ2418",
+        "FJ2429"
+      ],
+      "trimmed": false,
+      "triangles": 1596
+    },
+    "Right coronary artery": {
+      "elements": [
+        "FJ2723",
+        "FJ2670",
+        "FJ2676",
+        "FJ2671",
+        "FJ2673",
+        "FJ2677",
+        "FJ2714",
+        "FJ2715",
+        "FJ2716",
+        "FJ2717",
+        "FJ2718",
+        "FJ2719",
+        "FJ2720",
+        "FJ2721",
+        "FJ2722"
+      ],
+      "trimmed": false,
+      "triangles": 9362
+    },
+    "Right marginal artery": {
+      "elements": [
+        "FJ2667",
+        "FJ2668",
+        "FJ2672",
+        "FJ2674",
+        "FJ2675"
+      ],
+      "trimmed": false,
+      "triangles": 1802
+    },
+    "Posterior descending artery": {
+      "elements": [
+        "FJ2692",
+        "FJ2693",
+        "FJ2694",
+        "FJ2695",
+        "FJ2696",
+        "FJ2697",
+        "FJ2698",
+        "FJ2699",
+        "FJ2700"
+      ],
+      "trimmed": false,
+      "triangles": 3518
+    },
+    "Left main coronary artery": {
+      "elements": [
+        "FJ2737"
+      ],
+      "trimmed": false,
+      "triangles": 204
+    },
+    "Left anterior descending artery": {
+      "elements": [
+        "FJ2631",
+        "FJ2632",
+        "FJ2633",
+        "FJ2634",
+        "FJ2635",
+        "FJ2636",
+        "FJ2637",
+        "FJ2638",
+        "FJ2639",
+        "FJ2640",
+        "FJ2641",
+        "FJ2642",
+        "FJ2643",
+        "FJ2644",
+        "FJ2645",
+        "FJ2646",
+        "FJ2647",
+        "FJ2648"
+      ],
+      "trimmed": false,
+      "triangles": 9444
+    },
+    "Circumflex artery": {
+      "elements": [
+        "FJ2649",
+        "FJ2650",
+        "FJ2651",
+        "FJ2652",
+        "FJ2653",
+        "FJ2654"
+      ],
+      "trimmed": false,
+      "triangles": 3018
+    },
+    "Coronary sinus and cardiac veins": {
+      "elements": [
+        "FJ2655",
+        "FJ2656",
+        "FJ2724",
+        "FJ2731",
+        "FJ2727",
+        "FJ2728",
+        "FJ2729"
+      ],
+      "trimmed": false,
+      "triangles": 4386
+    },
+    "Ascending aorta": {
+      "elements": [
+        "FJ3413"
+      ],
+      "trimmed": true,
+      "triangles": 396
+    },
+    "Aortic arch": {
+      "elements": [
+        "FJ3411"
+      ],
+      "trimmed": true,
+      "triangles": 469
+    },
+    "Descending aorta": {
+      "elements": [
+        "FJ1931"
+      ],
+      "trimmed": true,
+      "triangles": 1947
+    },
+    "Superior vena cava": {
+      "elements": [
+        "FJ3645"
+      ],
+      "trimmed": true,
+      "triangles": 389
+    },
+    "Inferior vena cava": {
+      "elements": [
+        "FJ3441"
+      ],
+      "trimmed": true,
+      "triangles": 855
+    },
+    "Pulmonary trunk": {
+      "elements": [
+        "FJ2966"
+      ],
+      "trimmed": true,
+      "triangles": 1302
+    },
+    "Pulmonary arteries": {
+      "elements": [
+        "FJ2881",
+        "FJ2883",
+        "FJ2884",
+        "FJ2885",
+        "FJ2888",
+        "FJ2891",
+        "FJ2894",
+        "FJ2902",
+        "FJ2904",
+        "FJ2905",
+        "FJ2906",
+        "FJ2907",
+        "FJ2908",
+        "FJ2909",
+        "FJ2910",
+        "FJ2911",
+        "FJ2915",
+        "FJ2919",
+        "FJ2921",
+        "FJ2924",
+        "FJ2967",
+        "FJ2970",
+        "FJ2973",
+        "FJ2974",
+        "FJ2975",
+        "FJ2976",
+        "FJ2977",
+        "FJ2979",
+        "FJ2987",
+        "FJ2988",
+        "FJ2990",
+        "FJ2991",
+        "FJ2994",
+        "FJ2997",
+        "FJ3008",
+        "FJ3009",
+        "FJ3018",
+        "FJ3019"
+      ],
+      "trimmed": true,
+      "triangles": 16252
+    },
+    "Pulmonary veins": {
+      "elements": [
+        "FJ2925",
+        "FJ2927",
+        "FJ2930",
+        "FJ2931",
+        "FJ2932",
+        "FJ2933",
+        "FJ2934",
+        "FJ2935",
+        "FJ2936",
+        "FJ2937",
+        "FJ2938",
+        "FJ2939",
+        "FJ2944",
+        "FJ2950",
+        "FJ2951",
+        "FJ2953",
+        "FJ2955",
+        "FJ2956",
+        "FJ2959",
+        "FJ2960",
+        "FJ3020",
+        "FJ3021",
+        "FJ3022",
+        "FJ3027",
+        "FJ3028",
+        "FJ3030",
+        "FJ3031",
+        "FJ3032",
+        "FJ3033",
+        "FJ3034",
+        "FJ3037",
+        "FJ3040",
+        "FJ3041",
+        "FJ3043",
+        "FJ3049",
+        "FJ3050",
+        "FJ3051",
+        "FJ3056",
+        "FJ3057",
+        "FJ3058",
+        "FJ3059",
+        "FJ3060",
+        "FJ3063",
+        "FJ3065",
+        "FJ3069"
+      ],
+      "trimmed": true,
+      "triangles": 10177
+    }
+  },
+  "totalTriangles": 131281
+}

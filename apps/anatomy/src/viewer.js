@@ -9,6 +9,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { STLLoader } from "three/addons/loaders/STLLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import bodyparts3dHeartUrl from "../models/bodyparts3d-heart/heart.glb?url";
 import { HAND_CONNECTIONS, createSlots, createTracker, isCameraBlocked, loadSettings, startCamera } from "@heart-hands/core";
 
 // ---------- settings ----------
@@ -74,8 +75,17 @@ let look = LOOKS[(() => { try { return localStorage.getItem(LOOK_KEY); } catch {
 
 function colorFor(name, i) {
   const n = name.toLowerCase();
-  if (/(aort|left|pulmonary vein|lv|la\b)/.test(n)) return look.red;
-  if (/(right|pulmonary (artery|trunk)|cava|rv|ra\b|svc|ivc)/.test(n)) return look.blue;
+  // Vessels by oxygenation first: pulmonary veins carry oxygenated blood (red),
+  // pulmonary arteries deoxygenated (blue); other arteries red, other veins blue.
+  if (/pulmonary vein/.test(n)) return look.red;
+  if (/pulmonary (arter|trunk)|cava|coronary sinus|cardiac vein/.test(n)) return look.blue;
+  if (/arter|circumflex/.test(n)) return look.red;
+  // Valves get distinct colours so the four are easy to tell apart.
+  if (/valve/.test(n)) return look.palette[i % look.palette.length];
+  // Otherwise by side of the heart (the prototype's rule; abbreviations are
+  // whole words so "lv" doesn't match inside "valve").
+  if (/(aort|left|pulmonary vein|\blv\b|\bla\b)/.test(n)) return look.red;
+  if (/(right|pulmonary (artery|trunk)|cava|\brv\b|\bra\b|svc|ivc)/.test(n)) return look.blue;
   return look.palette[i % look.palette.length];
 }
 function makeMaterial(color) { return look.material(color); }
@@ -460,12 +470,46 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+// ---------- built-in models ----------
+// "realistic": BodyParts3D heart, bundled into the page (see
+// models/bodyparts3d-heart/README.md). "schematic": the prototype's
+// hand-built heart. A user's own GLB/STL files replace either.
+const MODEL_KEY = "heart-hands:viewer-model";
+const CREDIT = "Model: BodyParts3D, © DBCLS, CC BY-SA 2.1 JP (modified)";
+let builtIn = (() => { try { return localStorage.getItem(MODEL_KEY) === "schematic" ? "schematic" : "realistic"; } catch { return "realistic"; } })();
+let lastFiles = null;   // the user's own files, if they loaded some; replaces the built-in model
+$("file").addEventListener("change", (e) => { if (e.target.files.length) { lastFiles = [...e.target.files]; showCredit(false); } });
+addEventListener("drop", (e) => { if (e.dataTransfer.files.length) { lastFiles = [...e.dataTransfer.files]; showCredit(false); } });
+function showCredit(on) { $("credit").hidden = !on; }
+async function loadRealisticHeart() {
+  setStatus("Loading model…");
+  try {
+    const gltf = await gltfLoader.loadAsync(bodyparts3dHeartUrl);
+    // glTF loading turns spaces in part names into underscores; put them back.
+    gltf.scene.children.forEach((o) => (o.name = o.name.replace(/_/g, " ")));
+    registerModel(gltf.scene, "Realistic model · BodyParts3D");
+    showCredit(true); setStatus("");
+  } catch (err) {
+    console.error(err);
+    setStatus("Couldn't load the realistic heart. Showing the schematic model.");
+    registerModel(buildSchematicHeart(), look.schematicName); showCredit(false);
+  }
+}
+function loadBuiltIn() {
+  fresnelUniformsAll.length = 0;
+  if (builtIn === "realistic") return loadRealisticHeart();
+  showCredit(false); registerModel(buildSchematicHeart(), look.schematicName);
+}
+$("modelSel").value = builtIn;
+$("modelSel").addEventListener("change", () => {
+  builtIn = $("modelSel").value === "schematic" ? "schematic" : "realistic";
+  try { localStorage.setItem(MODEL_KEY, builtIn); } catch { /* storage blocked: choice just isn't remembered */ }
+  lastFiles = null; loadBuiltIn();
+});
+
 // ---------- look switching ----------
 // Rebuilding re-runs the unchanged loader on the same source, so a loaded
 // GLB/STL set keeps working. Part positions and hidden parts reset.
-let lastFiles = null;   // files of the current model; null = built-in schematic
-$("file").addEventListener("change", (e) => { if (e.target.files.length) lastFiles = [...e.target.files]; });
-addEventListener("drop", (e) => { if (e.dataTransfer.files.length) lastFiles = [...e.dataTransfer.files]; });
 function applyLook() {
   document.body.classList.toggle("look-flat", look === LOOKS.flat);
   holoRig.visible = look === LOOKS.hologram; flatRig.visible = look === LOOKS.flat;
@@ -476,14 +520,15 @@ function setLook(next) {
   try { localStorage.setItem(LOOK_KEY, look.label); } catch { /* storage blocked: look just isn't remembered */ }
   applyLook();
   fresnelUniformsAll.length = 0;
-  if (lastFiles) loadFiles(lastFiles); else registerModel(buildSchematicHeart(), look.schematicName);
+  if (lastFiles) loadFiles(lastFiles); else loadBuiltIn();
 }
 const toggleLook = () => setLook(look === LOOKS.hologram ? LOOKS.flat : LOOKS.hologram);
 $("lookBtn").addEventListener("click", toggleLook);
 addEventListener("keydown", (e) => { if (e.key === "v" || e.key === "V") toggleLook(); });
 
 applyLook();
-registerModel(buildSchematicHeart(), look.schematicName);
+$("credit").textContent = CREDIT;
+loadBuiltIn();
 requestAnimationFrame(frame);
 
 (async () => {
