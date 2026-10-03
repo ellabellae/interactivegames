@@ -556,7 +556,7 @@ requestAnimationFrame(frame);
 const HANDS_KEY = "heart-hands:viewer-hands";
 let handsOn = false;
 function showHandsState() {
-  $("handsBtn").textContent = `Hand control: ${handsOn ? "on" : "off"}`;
+  $("handsBtn").textContent = `✋ Use webcam: ${handsOn ? "on" : "off"}`;
   $("handsBtn").setAttribute("aria-pressed", String(handsOn));
   document.body.classList.toggle("hands-off", !handsOn);
 }
