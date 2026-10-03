@@ -1,14 +1,12 @@
-# Heart Hands
+# Overview
 
-Webcam hand-tracking tools that run in a web browser. There are two parts,
-built on one shared codebase:
+I am building webcam hand-tracking tools that run in a web browser to explore how visual aid and interactive motion can aid in learning or potential rehabilitation. During my Duke years, I have taken a few phisology and biology classes, and thought it would be cool to enhance the potential for learning by making the anatomy 3d. Eventually, I'd want to build this out further for med-students or even doctors to see and interact with body parts in 3D. I am exploring two avenues on this codebase: 
 
 - **Heart anatomy and physiology**: a 3D heart built from real anatomy data
   that you can turn, take apart and label, with your hands through the
   webcam or with the mouse, and a lesson that follows one
-  heartbeat through the heart's conduction system. For students learning
-  anatomy and physiology.
-- **Hand games**: gesture games for one or two people on one webcam. They
+  heartbeat through the heart's conduction system. All the anatomy is built from BodyParts3D, a free 3D anatomy database made by Database Center for Life Science in Japan. 
+  - **Hand games**: gesture games for one or two people on one webcam. They
   give people with Parkinson's a playful way to practise hand movements
   such as pinching, lifting, stirring and chopping.
 
