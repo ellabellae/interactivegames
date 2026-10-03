@@ -3,11 +3,25 @@
 Webcam hand-tracking tools that run in a web browser. There are two parts,
 built on one shared codebase:
 
-- **Heart anatomy**: a 3D heart you can turn, take apart and label, with
-  your hands or the mouse. For students learning anatomy and physiology.
+- **Heart anatomy and physiology**: a 3D heart built from real anatomy data
+  that you can turn, take apart and label, and a lesson that follows one
+  heartbeat through the heart's conduction system. For students learning
+  anatomy and physiology.
 - **Hand games**: gesture games for one or two people on one webcam. They
   give people with Parkinson's a playful way to practise hand movements
   such as pinching, lifting, stirring and chopping.
+
+### [Try it in your browser →](https://ellabellae.github.io/interactivegames/)
+
+A working site, not a video. No install needed. Open the heart, drag to turn
+it, press E to take it apart, then open the physiology lesson and step
+through a heartbeat.
+
+![The realistic heart turning, exploding into its parts, the tricuspid valve on its own, then one heartbeat: the SA node fires, the atria depolarise, the AV node holds the impulse, the bundle branches and Purkinje fibres light up, and the ventricles depolarise](docs/img/demo.gif)
+
+| A real heart, not a cartoon: chambers, valves, coronary arteries and great vessels | Take it apart to see the valves and chambers | Follow one heartbeat in slow motion, with the lecture's timings |
+|---|---|---|
+| ![Front view of the realistic heart](docs/img/heart-front.jpg) | ![The heart exploded into its parts](docs/img/heart-exploded.jpg) | ![The conduction lesson during the AV-node delay](docs/img/lesson-av-delay.jpg) |
 
 ## Not a medical device
 
@@ -21,18 +35,48 @@ time and adjusting the game settings, not a measure of health.
 
 ### Heart anatomy (`apps/anatomy`)
 
-- A schematic heart with labelled, separable parts (chambers, great vessels).
+- **A realistic heart** built from BodyParts3D, a 3D anatomy database made
+  from a scanned adult body. It has 26 labelled, separable parts:
+  - the four chambers
+  - all four valves
+  - papillary muscles
+  - coronary arteries by branch
+  - the coronary sinus and cardiac veins
+  - the great vessels
+
+  Vessels are coloured by oxygenation. See
+  `apps/anatomy/models/bodyparts3d-heart/` for its source and licence.
+- **The original schematic heart** is still available from the model menu.
 - **Load your own model:** one `.glb` file with named parts, or several
   `.stl` files, one per structure (for example exported from 3D Slicer).
   Use the "Load model" button or drop the files on the page.
 - Two looks: hologram and flat.
 - Controls:
-  - **Hands:** open hand to rotate; pinch a part to grab and move it; two
-    hands apart to zoom.
+  - **Hands** (turn on "Hand control" first; it's off by default): open
+    hand to rotate; pinch a part to grab and move it; two hands apart to
+    zoom.
   - **Mouse:** drag to rotate, scroll to zoom, click a part (or its name in
     the list) to show only that part.
   - **Keys:** E explode, R reset, L labels, B heartbeat, V look.
 - A separate particle-heart demo page.
+
+### Physiology lessons (`apps/physiology`)
+
+- **Excitation and conduction:** follows one heartbeat through the realistic
+  heart, step by step:
+  - the SA node fires and the wave crosses the atria
+  - the AV node holds the impulse for about 100 ms
+  - the bundle of His, bundle branches and Purkinje fibres carry it on
+  - the ventricles depolarise and contract
+- **Controls:** play, pause, step, slow motion (1/10 speed) and a
+  millisecond timeline you can drag.
+- **Where the timings come from:** the course lecture, with slide numbers
+  recorded in `apps/physiology/src/conduction-model.js`. The one value not
+  from the lecture is labelled there.
+- **Conduction-system positions are approximate.** BodyParts3D doesn't
+  include the conduction system, so it is placed by rules from nearby
+  anatomy, written out in `scripts/compute-conduction-landmarks.mjs`.
+- This is a simplified teaching model, not a clinical simulation.
 
 ### Hand games (`apps/games`)
 
@@ -221,7 +265,8 @@ values that were in effect for every session.
 ```
 packages/core/       shared code: settings and profiles, gesture detection,
                      hand tracking, player slots, sound, progress log
-apps/anatomy/        heart viewer and particle demo
+apps/anatomy/        heart viewer, realistic heart model, particle demo
+apps/physiology/     physiology lessons (conduction)
 apps/games/          games menu, Kitchen, Bricks, Progress page
 site/index.html      home page linking the apps
 scripts/build.mjs    builds every page into dist/
